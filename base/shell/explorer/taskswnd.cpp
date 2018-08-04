@@ -1582,25 +1582,13 @@ public:
 
             if (!bIsMinimized && bIsActive)
             {
-                ::PostMessage(TaskItem->hWnd,
-                    WM_SYSCOMMAND,
-                    SC_MINIMIZE,
-                    0);
+                ::ShowWindowAsync(TaskItem->hWnd, SW_MINIMIZE);
                 TRACE("Valid button clicked. App window Minimized.\n");
             }
             else
             {
-                if (bIsMinimized)
-                {
-                    ::PostMessage(TaskItem->hWnd,
-                        WM_SYSCOMMAND,
-                        SC_RESTORE,
-                        0);
-                    TRACE("Valid button clicked. App window Restored.\n");
-                }
-
-                SetForegroundWindow(TaskItem->hWnd);
-                TRACE("Valid button clicked. App window Activated.\n");
+                ::SwitchToThisWindow(TaskItem->hWnd, TRUE);
+                TRACE("Valid button clicked. App window Restored.\n");
             }
         }
     }
@@ -1929,7 +1917,7 @@ public:
         {
             /* A hard error balloon message */
             PBALLOON_HARD_ERROR_DATA pData = (PBALLOON_HARD_ERROR_DATA)cpData->lpData;
-            ERR("Got balloon data 0x%x, 0x%x, %S, %S!\n", pData->Status, pData->dwType, (WCHAR*)((ULONG_PTR)pData + pData->TitleOffset), (WCHAR*)((ULONG_PTR)pData + pData->MessageOffset));
+            ERR("Got balloon data 0x%x, 0x%x, '%S', '%S'\n", pData->Status, pData->dwType, (WCHAR*)((ULONG_PTR)pData + pData->TitleOffset), (WCHAR*)((ULONG_PTR)pData + pData->MessageOffset));
             if (pData->cbHeaderSize == sizeof(BALLOON_HARD_ERROR_DATA))
                 m_HardErrorThread.StartThread(pData);
             return TRUE;
