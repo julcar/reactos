@@ -4,7 +4,7 @@ list(APPEND INF_FILES
     audio.inf
     battery.inf
     bda.inf
-    bth.inf
+#    bth.inf
     c_image.inf
     cdrom.inf
     cpu.inf
@@ -15,7 +15,7 @@ list(APPEND INF_FILES
     hal.inf
     hdaudbus.inf
     hdc.inf
-    input.inf
+#    input.inf
     keyboard.inf
     ks.inf
     kscaptur.inf
@@ -33,9 +33,9 @@ list(APPEND INF_FILES
     scsi.inf
     shortcuts.inf
     unknown.inf
-    usb.inf
-    usbport.inf
-    usbstor.inf
+#    usb.inf
+#    usbport.inf
+#    usbstor.inf
     wdmaudio.inf
     wmiacpi.inf
     xboxdisp.inf)
