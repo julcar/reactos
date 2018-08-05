@@ -4,7 +4,7 @@ ClassGUID = {00000000-0000-0000-0000-000000000000}
 
 [DeviceInfsToInstall]
 battery.inf
-bth.inf
+;bth.inf
 cdrom.inf
 cpu.inf
 disk.inf
@@ -13,7 +13,7 @@ fdc.inf
 flpydisk.inf
 hal.inf
 hdc.inf
-input.inf
+;input.inf
 keyboard.inf
 legcydrv.inf
 machine.inf
@@ -23,7 +23,7 @@ NET_NIC.inf
 ports.inf
 scsi.inf
 unknown.inf
-usbport.inf
+;usbport.inf
 audio.inf
 ks.inf
 c_image.inf
