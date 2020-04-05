@@ -885,7 +885,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR cmdline, int show) {
   // Return the WM_QUIT value.
   return msg.wParam;
 }
-
+#if 0
 int main(int argc, char *argv[]) {
   init_utf8_argc_argv();
   argc = my_argc;
@@ -906,3 +906,4 @@ int main(int argc, char *argv[]) {
 
   return EXIT_SUCCESS;
 }
+#endif
