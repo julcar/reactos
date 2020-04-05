@@ -39,7 +39,6 @@
 #include <ctype.h>
 #include <stdarg.h>
 
-#ifdef _WIN32
 #include <windows.h>
 #include <process.h>    // For _beginthread
 #include <io.h>         // For _lseeki64
@@ -79,33 +78,6 @@ typedef struct _stati64 file_stat_t;
 #define STRX(x) #x
 #define STR(x) STRX(x)
 #define __func__ __FILE__ ":" STR(__LINE__)
-#endif
-#else
-#include <dirent.h>
-#include <inttypes.h>
-#include <pthread.h>
-#include <pwd.h>
-#include <signal.h>
-#include <unistd.h>
-#include <netdb.h>
-#include <arpa/inet.h>  // For inet_pton() when USE_IPV6 is defined
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/select.h>
-#define closesocket(x) close(x)
-typedef int sock_t;
-typedef pthread_mutex_t mutex_t;
-typedef struct stat file_stat_t;
-#define mutex_init(x) pthread_mutex_init(x, NULL)
-#define mutex_destroy(x) pthread_mutex_destroy(x)
-#define mutex_lock(x) pthread_mutex_lock(x)
-#define mutex_unlock(x) pthread_mutex_unlock(x)
-#define get_thread_id() ((unsigned long) pthread_self())
-#define INVALID_SOCKET ((sock_t) -1)
-#define INT64_FMT PRId64
-#define to64(x) strtoll(x, NULL, 10)
-#define __cdecl
-#define O_BINARY 0
 #endif
 
 #ifdef USE_SSL
@@ -225,9 +197,6 @@ enum {
   INDEX_FILES,
 #endif
   LISTENING_PORT,
-#ifndef _WIN32
-  RUN_AS_USER,
-#endif
 #ifdef USE_SSL
   SSL_CERTIFICATE,
 #endif
@@ -255,9 +224,6 @@ static const char *static_config_options[] = {
   "index_files","index.html,index.htm,index.cgi,index.php,index.lp",
 #endif
   "listening_port", NULL,
-#ifndef _WIN32
-  "run_as_user", NULL,
-#endif
 #ifdef USE_SSL
   "ssl_certificate", NULL,
 #endif
@@ -377,29 +343,10 @@ static const struct {
 
 #ifndef NO_THREADS
 void *mg_start_thread(void *(*f)(void *), void *p) {
-#ifdef _WIN32
   return (void *) _beginthread((void (__cdecl *)(void *)) f, 0, p);
-#else
-  pthread_t thread_id = (pthread_t) 0;
-  pthread_attr_t attr;
-
-  (void) pthread_attr_init(&attr);
-  (void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-
-#if USE_STACK_SIZE > 1
-  // Compile-time option to control stack size, e.g. -DUSE_STACK_SIZE=16384
-  (void) pthread_attr_setstacksize(&attr, USE_STACK_SIZE);
-#endif
-
-  pthread_create(&thread_id, &attr, f, p);
-  pthread_attr_destroy(&attr);
-
-  return (void *) thread_id;
-#endif
 }
 #endif  // NO_THREADS
 
-#ifdef _WIN32
 // Encode 'path' which is assumed UTF-8 string, into UNICODE string.
 // wbuf and wbuf_len is a target buffer and its length.
 static void to_wchar(const char *path, wchar_t *wbuf, size_t wbuf_len) {
@@ -442,24 +389,14 @@ static int mg_open(const char *path, int flag) {
   to_wchar(path, wpath, ARRAY_SIZE(wpath));
   return _wopen(wpath, flag);
 }
-#endif
 
 static void set_close_on_exec(int fd) {
-#ifdef _WIN32
   (void) SetHandleInformation((HANDLE) fd, HANDLE_FLAG_INHERIT, 0);
-#else
-  fcntl(fd, F_SETFD, FD_CLOEXEC);
-#endif
 }
 
 static void set_non_blocking_mode(sock_t sock) {
-#ifdef _WIN32
   unsigned long on = 1;
   ioctlsocket(sock, FIONBIO, &on);
-#else
-  int flags = fcntl(sock, F_GETFL, 0);
-  fcntl(sock, F_SETFL, flags | O_NONBLOCK);
-#endif
 }
 
 // A helper function for traversing a comma separated list of values.
@@ -782,7 +719,6 @@ static int is_error(int n) {
 }
 
 #ifndef NO_CGI
-#ifdef _WIN32
 struct threadparam {
   sock_t s;
   HANDLE hPipe;
@@ -917,40 +853,6 @@ static pid_t start_process(char *interp, const char *cmd, const char *env,
 
   return (pid_t) pi.hProcess;
 }
-#else
-static pid_t start_process(const char *interp, const char *cmd, const char *env,
-                           const char *envp[], const char *dir, sock_t sock) {
-  char buf[500];
-  pid_t pid = fork();
-  (void) env;
-
-  if (pid == 0) {
-    chdir(dir);
-    dup2(sock, 0);
-    dup2(sock, 1);
-    closesocket(sock);
-
-    // After exec, all signal handlers are restored to their default values,
-    // with one exception of SIGCHLD. According to POSIX.1-2001 and Linux's
-    // implementation, SIGCHLD's handler will leave unchanged after exec
-    // if it was set to be ignored. Restore it to default action.
-    signal(SIGCHLD, SIG_DFL);
-
-    if (interp == NULL) {
-      execle(cmd, cmd, NULL, envp);
-    } else {
-      execle(interp, interp, cmd, NULL, envp);
-    }
-    snprintf(buf, sizeof(buf), "Status: 500\r\n\r\n"
-             "500 Server Error: %s%s%s: %s", interp == NULL ? "" : interp,
-             interp == NULL ? "" : " ", cmd, strerror(errno));
-    send(1, buf, strlen(buf), 0);
-    exit(EXIT_FAILURE);  // exec call failed
-  }
-
-  return pid;
-}
-#endif  // _WIN32
 
 // This structure helps to create an environment for the spawned CGI program.
 // Environment is an array of "VARIABLE=VALUE\0" ASCIIZ strings,
@@ -1065,16 +967,12 @@ static void prepare_cgi_environment(struct connection *conn,
   addenv2(blk, "PERLLIB");
   addenv2(blk, ENV_EXPORT_TO_CGI);
 
-#if defined(_WIN32)
   addenv2(blk, "COMSPEC");
   addenv2(blk, "SYSTEMROOT");
   addenv2(blk, "SystemDrive");
   addenv2(blk, "ProgramFiles");
   addenv2(blk, "ProgramFiles(x86)");
   addenv2(blk, "CommonProgramFiles(x86)");
-#else
-  addenv2(blk, "LD_LIBRARY_PATH");
-#endif // _WIN32
 
   // Add all headers as HTTP_* variables
   for (i = 0; i < ri->num_headers; i++) {
@@ -1134,9 +1032,6 @@ static void open_cgi_endpoint(struct connection *conn, const char *prog) {
     send_http_error(conn, 500, "start_process(%s) failed", prog);
   }
 
-#ifndef _WIN32
-  closesocket(fds[1]);  // On Windows, CGI stdio thread closes that socket
-#endif
 }
 
 static void read_from_cgi(struct connection *conn) {
@@ -2184,7 +2079,6 @@ static void call_uri_handler_if_data_is_buffered(struct connection *conn) {
 
 #if !defined(NO_DIRECTORY_LISTING) || !defined(NO_DAV)
 
-#ifdef _WIN32
 struct dirent {
   char d_name[MAX_PATH_SIZE];
 };
@@ -2262,7 +2156,6 @@ static struct dirent *readdir(DIR *dir) {
 
   return result;
 }
-#endif // _WIN32  POSIX opendir/closedir/readdir implementation
 
 static int must_hide_file(struct connection *conn, const char *path) {
   const char *pw_pattern = "**" PASSWORDS_FILE_NAME "$";
@@ -2588,14 +2481,9 @@ static void handle_put(struct connection *conn, const char *path) {
     send_http_error(conn, 500, "put_dir: %s", strerror(errno));
   } else if (cl_hdr == NULL) {
     send_http_error(conn, 411, NULL);
-#ifdef _WIN32
     //On Windows, open() is a macro with 2 params
   } else if ((conn->endpoint.fd =
               open(path, O_RDWR | O_CREAT | O_TRUNC)) < 0) {
-#else
-  } else if ((conn->endpoint.fd =
-              open(path, O_RDWR | O_CREAT | O_TRUNC, 0644)) < 0) {
-#endif
     send_http_error(conn, 500, "open(%s): %s", path, strerror(errno));
   } else {
     //DBG(("PUT [%s] %d", path, conn->local_iobuf.len));
@@ -3017,276 +2905,6 @@ int mg_parse_header(const char *s, const char *var_name, char *buf,
                     size_t buf_size) {
   return parse_header(s, s == NULL ? 0 : strlen(s), var_name, buf, buf_size);
 }
-
-#ifdef USE_LUA
-#include "lua_5.2.1.h"
-
-#ifdef _WIN32
-static void *mmap(void *addr, int64_t len, int prot, int flags, int fd,
-                  int offset) {
-  HANDLE fh = (HANDLE) _get_osfhandle(fd);
-  HANDLE mh = CreateFileMapping(fh, 0, PAGE_READONLY, 0, 0, 0);
-  void *p = MapViewOfFile(mh, FILE_MAP_READ, 0, 0, (size_t) len);
-  CloseHandle(mh);
-  return p;
-}
-#define munmap(x, y)  UnmapViewOfFile(x)
-#define MAP_FAILED NULL
-#define MAP_PRIVATE 0
-#define PROT_READ 0
-#else
-#include <sys/mman.h>
-#endif
-
-static void reg_string(struct lua_State *L, const char *name, const char *val) {
-  lua_pushstring(L, name);
-  lua_pushstring(L, val);
-  lua_rawset(L, -3);
-}
-
-static void reg_int(struct lua_State *L, const char *name, int val) {
-  lua_pushstring(L, name);
-  lua_pushinteger(L, val);
-  lua_rawset(L, -3);
-}
-
-static void reg_function(struct lua_State *L, const char *name,
-                         lua_CFunction func, struct mg_connection *conn) {
-  lua_pushstring(L, name);
-  lua_pushlightuserdata(L, conn);
-  lua_pushcclosure(L, func, 1);
-  lua_rawset(L, -3);
-}
-
-static int lua_write(lua_State *L) {
-  int i, num_args;
-  const char *str;
-  size_t size;
-  struct mg_connection *conn = (struct mg_connection *)
-    lua_touserdata(L, lua_upvalueindex(1));
-
-  num_args = lua_gettop(L);
-  for (i = 1; i <= num_args; i++) {
-    if (lua_isstring(L, i)) {
-      str = lua_tolstring(L, i, &size);
-      mg_write(conn, str, size);
-    }
-  }
-
-  return 0;
-}
-
-static int lsp_sock_close(lua_State *L) {
-  if (lua_gettop(L) > 0 && lua_istable(L, -1)) {
-    lua_getfield(L, -1, "sock");
-    closesocket((sock_t) lua_tonumber(L, -1));
-  } else {
-    return luaL_error(L, "invalid :close() call");
-  }
-  return 1;
-}
-
-static int lsp_sock_recv(lua_State *L) {
-  char buf[2000];
-  int n;
-
-  if (lua_gettop(L) > 0 && lua_istable(L, -1)) {
-    lua_getfield(L, -1, "sock");
-    n = recv((sock_t) lua_tonumber(L, -1), buf, sizeof(buf), 0);
-    if (n <= 0) {
-      lua_pushnil(L);
-    } else {
-      lua_pushlstring(L, buf, n);
-    }
-  } else {
-    return luaL_error(L, "invalid :close() call");
-  }
-  return 1;
-}
-
-static int lsp_sock_send(lua_State *L) {
-  const char *buf;
-  size_t len, sent = 0;
-  int n, sock;
-
-  if (lua_gettop(L) > 1 && lua_istable(L, -2) && lua_isstring(L, -1)) {
-    buf = lua_tolstring(L, -1, &len);
-    lua_getfield(L, -2, "sock");
-    sock = (int) lua_tonumber(L, -1);
-    while (sent < len) {
-      if ((n = send(sock, buf + sent, len - sent, 0)) <= 0) break;
-      sent += n;
-    }
-    lua_pushnumber(L, sent);
-  } else {
-    return luaL_error(L, "invalid :close() call");
-  }
-  return 1;
-}
-
-static const struct luaL_Reg luasocket_methods[] = {
-  {"close", lsp_sock_close},
-  {"send", lsp_sock_send},
-  {"recv", lsp_sock_recv},
-  {NULL, NULL}
-};
-
-static sock_t conn2(const char *host, int port) {
-  struct sockaddr_in sin;
-  struct hostent *he = NULL;
-  sock_t sock = INVALID_SOCKET;
-
-  if (host != NULL &&
-      (he = gethostbyname(host)) != NULL &&
-    (sock = socket(PF_INET, SOCK_STREAM, 0)) != INVALID_SOCKET) {
-    set_close_on_exec(sock);
-    sin.sin_family = AF_INET;
-    sin.sin_port = htons((uint16_t) port);
-    sin.sin_addr = * (struct in_addr *) he->h_addr_list[0];
-    if (connect(sock, (struct sockaddr *) &sin, sizeof(sin)) != 0) {
-      closesocket(sock);
-      sock = INVALID_SOCKET;
-    }
-  }
-  return sock;
-}
-
-static int lsp_connect(lua_State *L) {
-  sock_t sock;
-
-  if (lua_isstring(L, -2) && lua_isnumber(L, -1)) {
-    sock = conn2(lua_tostring(L, -2), (int) lua_tonumber(L, -1));
-    if (sock == INVALID_SOCKET) {
-      lua_pushnil(L);
-    } else {
-      lua_newtable(L);
-      reg_int(L, "sock", sock);
-      reg_string(L, "host", lua_tostring(L, -4));
-      luaL_getmetatable(L, "luasocket");
-      lua_setmetatable(L, -2);
-    }
-  } else {
-    return luaL_error(L, "connect(host,port): invalid parameter given.");
-  }
-  return 1;
-}
-
-static void prepare_lua_environment(struct mg_connection *ri, lua_State *L) {
-  extern void luaL_openlibs(lua_State *);
-  int i;
-
-  luaL_openlibs(L);
-#ifdef USE_LUA_SQLITE3
-  { extern int luaopen_lsqlite3(lua_State *); luaopen_lsqlite3(L); }
-#endif
-
-  luaL_newmetatable(L, "luasocket");
-  lua_pushliteral(L, "__index");
-  luaL_newlib(L, luasocket_methods);
-  lua_rawset(L, -3);
-  lua_pop(L, 1);
-  lua_register(L, "connect", lsp_connect);
-
-  if (ri == NULL) return;
-
-  // Register mg module
-  lua_newtable(L);
-  reg_function(L, "write", lua_write, ri);
-
-  // Export request_info
-  lua_pushstring(L, "request_info");
-  lua_newtable(L);
-  reg_string(L, "request_method", ri->request_method);
-  reg_string(L, "uri", ri->uri);
-  reg_string(L, "http_version", ri->http_version);
-  reg_string(L, "query_string", ri->query_string);
-  reg_string(L, "remote_ip", ri->remote_ip);
-  reg_int(L, "remote_port", ri->remote_port);
-  lua_pushstring(L, "content");
-  lua_pushlstring(L, ri->content == NULL ? "" : ri->content, 0);
-  lua_rawset(L, -3);
-  reg_int(L, "content_len", ri->content_len);
-  reg_int(L, "num_headers", ri->num_headers);
-  lua_pushstring(L, "http_headers");
-  lua_newtable(L);
-  for (i = 0; i < ri->num_headers; i++) {
-    reg_string(L, ri->http_headers[i].name, ri->http_headers[i].value);
-  }
-  lua_rawset(L, -3);
-  lua_rawset(L, -3);
-
-  lua_setglobal(L, "mg");
-
-  // Register default mg.onerror function
-  (void) luaL_dostring(L, "mg.onerror = function(e) mg.write('\\nLua "
-                       "error:\\n', debug.traceback(e, 1)) end");
-}
-
-static int lua_error_handler(lua_State *L) {
-  const char *error_msg =  lua_isstring(L, -1) ?  lua_tostring(L, -1) : "?\n";
-
-  lua_getglobal(L, "mg");
-  if (!lua_isnil(L, -1)) {
-    lua_getfield(L, -1, "write");   // call mg.write()
-    lua_pushstring(L, error_msg);
-    lua_pushliteral(L, "\n");
-    lua_call(L, 2, 0);
-    (void) luaL_dostring(L, "mg.write(debug.traceback(), '\\n')");
-  } else {
-    printf("Lua error: [%s]\n", error_msg);
-    (void) luaL_dostring(L, "print(debug.traceback(), '\\n')");
-  }
-  // TODO(lsm): leave the stack balanced
-
-  return 0;
-}
-
-static void lsp(struct connection *conn, const char *p, int len, lua_State *L) {
-  int i, j, pos = 0;
-
-  for (i = 0; i < len; i++) {
-    if (p[i] == '<' && p[i + 1] == '?') {
-      for (j = i + 1; j < len ; j++) {
-        if (p[j] == '?' && p[j + 1] == '>') {
-          mg_write(&conn->mg_conn, p + pos, i - pos);
-          if (luaL_loadbuffer(L, p + (i + 2), j - (i + 2), "") == LUA_OK) {
-            lua_pcall(L, 0, LUA_MULTRET, 0);
-          }
-          pos = j + 2;
-          i = pos - 1;
-          break;
-        }
-      }
-    }
-  }
-  if (i > pos) mg_write(&conn->mg_conn, p + pos, i - pos);
-}
-
-static void handle_lsp_request(struct connection *conn, const char *path,
-                               file_stat_t *st) {
-  void *p = NULL;
-  lua_State *L = NULL;
-  FILE *fp = NULL;
-
-  if ((fp = fopen(path, "r")) == NULL ||
-      (p = mmap(NULL, st->st_size, PROT_READ, MAP_PRIVATE,
-                fileno(fp), 0)) == MAP_FAILED ||
-      (L = luaL_newstate()) == NULL) {
-    send_http_error(conn, 500, "mmap(%s): %s", path, strerror(errno));
-  } else {
-    // We're not sending HTTP headers here, Lua page must do it.
-    prepare_lua_environment(&conn->mg_conn, L);
-    lua_pushcclosure(L, &lua_error_handler, 0);
-    lua_pushglobaltable(L);
-    lsp(conn, p, st->st_size, L);
-    close_local_endpoint(conn);
-  }
-
-  if (L != NULL) lua_close(L);
-  if (p != NULL) munmap(p, st->st_size);
-  if (fp != NULL) fclose(fp);
-}
-#endif // USE_LUA
 
 static void open_local_endpoint(struct connection *conn) {
   const char *cl_hdr = mg_get_header(&conn->mg_conn, "Content-Length");
@@ -3913,17 +3531,6 @@ const char *mg_set_option(struct mg_server *server, const char *name,
       } else {
         set_non_blocking_mode(server->listening_sock);
       }
-#ifndef _WIN32
-    } else if (ind == RUN_AS_USER) {
-      struct passwd *pw;
-      if ((pw = getpwnam(value)) == NULL) {
-        error_msg = "Unknown user";
-      } else if (setgid(pw->pw_gid) != 0) {
-        error_msg = "setgid() failed";
-      } else if (setuid(pw->pw_uid) != 0) {
-        error_msg = "setuid() failed";
-      }
-#endif
 #ifdef USE_SSL
     } else if (ind == SSL_CERTIFICATE) {
       SSL_library_init();
@@ -3967,14 +3574,8 @@ const char *mg_get_option(const struct mg_server *server, const char *name) {
 struct mg_server *mg_create_server(void *server_data) {
   struct mg_server *server = (struct mg_server *) calloc(1, sizeof(*server));
 
-#ifdef _WIN32
   WSADATA data;
   WSAStartup(MAKEWORD(2, 2), &data);
-#else
-  // Ignore SIGPIPE signal, so if browser cancels the request, it
-  // won't kill the whole process.
-  signal(SIGPIPE, SIG_IGN);
-#endif
 
   LINKED_LIST_INIT(&server->active_connections);
   LINKED_LIST_INIT(&server->uri_handlers);
