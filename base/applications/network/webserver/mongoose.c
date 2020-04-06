@@ -270,7 +270,8 @@ enum connection_flags {
   CONN_HEADERS_SENT = 8,      // User callback has sent HTTP headers
   CONN_BUFFER = 16,           // CGI only. Holds data send until CGI prints
                               // all HTTP headers
-  CONN_CONNECTED = 32         // HTTP client has connected
+  CONN_CONNECTED = 32,        // HTTP client has connected
+  CONN_LONG_RUNNING = 64      // Long-running URI handlers
 };
 
 struct connection {
@@ -1797,6 +1798,8 @@ static void call_uri_handler(struct connection *conn) {
       write_terminating_chunk(conn);
     }
     close_local_endpoint(conn);
+    } else {
+    conn->flags |= CONN_LONG_RUNNING;
   }
 }
 
@@ -1818,11 +1821,6 @@ static void write_to_client(struct connection *conn) {
     memmove(io->buf, io->buf + n, io->len - n);
     io->len -= n;
     conn->num_bytes_sent += n;
-  }
-
-  if (conn->endpoint_type == EP_USER) {
-    conn->mg_conn.wsbits = conn->flags & CONN_CLOSE ? 1 : 0;
-    call_uri_handler(conn);
   }
 
   if (io->len == 0 && conn->flags & CONN_SPOOL_DONE) {
@@ -3107,6 +3105,40 @@ static void read_from_client(struct connection *conn) {
   }
 }
 
+struct mg_connection *mg_connect(struct mg_server *server, const char *host,
+                                 int port, mg_handler_t handler) {
+  sock_t sock = INVALID_SOCKET;
+  struct sockaddr_in sin;
+  struct hostent *he = NULL;
+  struct connection *conn = NULL;
+  int connected;
+
+  if (host == NULL || (he = gethostbyname(host)) == NULL ||
+      (sock = socket(PF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) return NULL;
+
+  sin.sin_family = AF_INET;
+  sin.sin_port = htons((uint16_t) port);
+  sin.sin_addr = * (struct in_addr *) he->h_addr_list[0];
+  set_non_blocking_mode(sock);
+
+  connected = connect(sock, (struct sockaddr *) &sin, sizeof(sin));
+  if (connected != 0 && errno != EINPROGRESS) {
+    return NULL;
+  } else if ((conn = (struct connection *) calloc(1, sizeof(*conn))) == NULL) {
+    closesocket(sock);
+    return NULL;
+  }
+
+  conn->client_sock = sock;
+  conn->endpoint_type = EP_CLIENT;
+  conn->handler = handler;
+  conn->mg_conn.server_param = server->server_data;
+  conn->flags = connected == 0 ? CONN_CONNECTED : 0;
+  LINKED_LIST_ADD_TO_FRONT(&server->active_connections, &conn->link);
+
+  return &conn->mg_conn;
+}
+
 static void read_from_server(struct connection *conn) {
   sock_t ok, sock = conn->client_sock;
   socklen_t len = sizeof(ok);
@@ -3217,49 +3249,15 @@ static void transfer_file_data(struct connection *conn) {
   }
 }
 
-struct mg_connection *mg_connect(struct mg_server *server, const char *host,
-                                 int port, mg_handler_t handler) {
-  sock_t sock = INVALID_SOCKET;
-  struct sockaddr_in sin;
-  struct hostent *he = NULL;
-  struct connection *conn = NULL;
-  int connected;
-
-  if (host == NULL || (he = gethostbyname(host)) == NULL ||
-      (sock = socket(PF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) return NULL;
-
-  sin.sin_family = AF_INET;
-  sin.sin_port = htons((uint16_t) port);
-  sin.sin_addr = * (struct in_addr *) he->h_addr_list[0];
-  set_non_blocking_mode(sock);
-
-  connected = connect(sock, (struct sockaddr *) &sin, sizeof(sin));
-  if (connected != 0 && errno != EINPROGRESS) {
-    return NULL;
-  } else if ((conn = (struct connection *) calloc(1, sizeof(*conn))) == NULL) {
-    closesocket(sock);
-    return NULL;
-  }
-
-  conn->client_sock = sock;
-  conn->endpoint_type = EP_CLIENT;
-  conn->handler = handler;
-  conn->mg_conn.server_param = server->server_data;
-  conn->flags = connected == 0 ? CONN_CONNECTED : 0;
-  LINKED_LIST_ADD_TO_FRONT(&server->active_connections, &conn->link);
-
-  return &conn->mg_conn;
-}
-
 static void execute_iteration(struct mg_server *server) {
   struct ll *lp, *tmp;
   struct connection *conn;
-  union { void (*f)(struct mg_connection *, void *); void *p; } msg[2];
-
+  union { mg_handler_t f; void *p; } msg[2];
   recv(server->ctl[1], (void *) msg, sizeof(msg), 0);
   LINKED_LIST_FOREACH(&server->active_connections, lp, tmp) {
     conn = LINKED_LIST_ENTRY(lp, struct connection, link);
-    msg[0].f(&conn->mg_conn, msg[1].p);
+    conn->mg_conn.connection_param = msg[1].p;
+    msg[0].f(&conn->mg_conn);
   }
 }
 
@@ -3337,6 +3335,10 @@ unsigned int mg_poll_server(struct mg_server *server, int milliseconds) {
         conn->last_activity_time = current_time;
         write_to_client(conn);
       }
+      if (conn->flags & CONN_LONG_RUNNING) {
+        conn->mg_conn.wsbits = conn->flags & CONN_CLOSE ? 1 : 0;
+        call_uri_handler(conn);
+      }
     }
   }
 
@@ -3383,12 +3385,11 @@ void mg_destroy_server(struct mg_server **server) {
 }
 
 // Apply function to all active connections.
-void mg_iterate_over_connections(struct mg_server *server,
-                                 void (*func)(struct mg_connection *, void *),
+void mg_iterate_over_connections(struct mg_server *server, mg_handler_t handler,
                                  void *param) {
   // Send closure (function + parameter) to the IO thread to execute
-  union { void (*f)(struct mg_connection *, void *); void *p; } msg[2];
-  msg[0].f = func;
+  union { mg_handler_t f; void *p; } msg[2];
+  msg[0].f = handler;
   msg[1].p = param;
   send(server->ctl[0], (void *) msg, sizeof(msg), 0);
 }
