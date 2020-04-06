@@ -138,11 +138,9 @@ struct ll { struct ll *prev, *next; };
 #define MAX_REQUEST_SIZE 16384
 #define IOBUF_SIZE 8192
 #define MAX_PATH_SIZE 8192
-#define LUA_SCRIPT_PATTERN "**.lp$"
 #define CGI_ENVIRONMENT_SIZE 4096
 #define MAX_CGI_ENVIR_VARS 64
 #define ENV_EXPORT_TO_CGI "MONGOOSE_CGI"
-#define PASSWORDS_FILE_NAME ".htpasswd"
 
 #ifndef USE_WEBSOCKET_PING_INTERVAL
 #define USE_WEBSOCKET_PING_INTERVAL 5
@@ -159,14 +157,6 @@ struct ll { struct ll *prev, *next; };
 
 #ifndef USE_IDLE_TIMEOUT_SECONDS
 #define USE_IDLE_TIMEOUT_SECONDS 30
-#endif
-
-#ifdef NO_FILESYSTEM
-#define NO_AUTH
-#define NO_CGI
-#define NO_DAV
-#define NO_DIRECTORY_LISTING
-#define NO_LOGGING
 #endif
 
 union socket_address {
@@ -192,29 +182,28 @@ struct dir_entry {
 // NOTE(lsm): this enum shoulds be in sync with the config_options.
 enum {
   ACCESS_CONTROL_LIST,
-#ifndef NO_FILESYSTEM
-  ACCESS_LOG_FILE, AUTH_DOMAIN, CGI_INTERPRETER,
-  CGI_PATTERN, DAV_AUTH_FILE, DOCUMENT_ROOT, ENABLE_DIRECTORY_LISTING,
-#endif
+  ACCESS_LOG_FILE,
+  AUTH_DOMAIN,
+  CGI_INTERPRETER,
+  CGI_PATTERN,
+  DAV_AUTH_FILE,
+  DOCUMENT_ROOT,
+  ENABLE_DIRECTORY_LISTING,
   EXTRA_MIME_TYPES,
   DEFAULT_MIME_TYPE,
-#ifndef NO_FILESYSTEM
   GLOBAL_AUTH_FILE,
-#endif
   HIDE_FILES_PATTERN,
-#ifndef NO_FILESYSTEM
   INDEX_FILES,
-#endif
   LISTENING_PORT,
 #ifdef USE_SSL
   SSL_CERTIFICATE,
 #endif
-  URL_REWRITES, NUM_OPTIONS
+  URL_REWRITES,
+  NUM_OPTIONS
 };
 
 static const char *static_config_options[] = {
   "access_control_list", NULL,
-#ifndef NO_FILESYSTEM
   "access_log_file", NULL,
   "auth_domain", "mydomain.com",
   "cgi_interpreter", NULL,
@@ -222,16 +211,11 @@ static const char *static_config_options[] = {
   "dav_auth_file", NULL,
   "document_root",  NULL,
   "enable_directory_listing", "yes",
-#endif
   "extra_mime_types", NULL,
   "default_mime_type", "text/plain",
-#ifndef NO_FILESYSTEM
   "global_auth_file", NULL,
-#endif
   "hide_files_patterns", NULL,
-#ifndef NO_FILESYSTEM
-  "index_files","index.html,index.htm,index.cgi,index.php,index.lp",
-#endif
+  "index_files","index.html,index.htm,index.cgi,index.php",
   "listening_port", NULL,
 #ifdef USE_SSL
   "ssl_certificate", NULL,
@@ -525,7 +509,6 @@ static int get_request_len(const char *s, int buf_len) {
       return i + 3;
     }
   }
-
   return 0;
 }
 
@@ -739,7 +722,6 @@ static int is_error(int n) {
     );
 }
 
-#ifndef NO_CGI
 struct threadparam {
   sock_t s;
   HANDLE hPipe;
@@ -1102,7 +1084,6 @@ static void forward_post_data(struct connection *conn) {
     io->len -= n;
   }
 }
-#endif  // !NO_CGI
 
 // 'sa' must be an initialized address to bind to
 static sock_t open_listening_socket(union socket_address *sa) {
@@ -1380,7 +1361,6 @@ const char *mg_get_header(const struct mg_connection *ri, const char *s) {
   return NULL;
 }
 
-#ifndef NO_FILESYSTEM
 // Perform case-insensitive match of string against pattern
 static int match_prefix(const char *pattern, int pattern_len, const char *str) {
   const char *or_str;
@@ -1461,7 +1441,6 @@ static int convert_uri_to_file_name(struct connection *conn, char *buf,
 
   if (stat(buf, st) == 0) return 1;
 
-#ifndef NO_CGI
   // Support PATH_INFO for CGI scripts.
   for (p = buf + strlen(root) + 2; *p != '\0'; p++) {
     if (*p == '/') {
@@ -1476,11 +1455,8 @@ static int convert_uri_to_file_name(struct connection *conn, char *buf,
       *p = '/';
     }
   }
-#endif
-
   return 0;
 }
-#endif  // NO_FILESYSTEM
 
 static int should_keep_alive(const struct mg_connection *conn) {
   const char *method = conn->request_method;
@@ -1887,7 +1863,6 @@ const char *mg_get_mime_type(struct mg_server *server, const char *path) {
   return server->config_options[DEFAULT_MIME_TYPE];
 }
 
-#ifndef NO_FILESYSTEM
 // Convert month to the month number. Return -1 on error, or month number
 static int get_month_index(const char *s) {
   static const char *month_names[] = {
@@ -2098,8 +2073,6 @@ static void open_file_endpoint(struct connection *conn, const char *path,
   }
 }
 
-#endif  // NO_FILESYSTEM
-
 static void call_request_handler_if_data_is_buffered(struct connection *conn) {
   struct iobuf *loc = &conn->local_iobuf;
   struct mg_connection *c = &conn->mg_conn;
@@ -2114,8 +2087,6 @@ static void call_request_handler_if_data_is_buffered(struct connection *conn) {
     open_local_endpoint(conn, 1);
   }
 }
-
-#if !defined(NO_DIRECTORY_LISTING) || !defined(NO_DAV)
 
 struct dirent {
   char d_name[MAX_PATH_SIZE];
@@ -2196,10 +2167,8 @@ static struct dirent *readdir(DIR *dir) {
 }
 
 static int must_hide_file(struct connection *conn, const char *path) {
-  const char *pw_pattern = "**" PASSWORDS_FILE_NAME "$";
   const char *pattern = conn->server->config_options[HIDE_FILES_PATTERN];
-  return match_prefix(pw_pattern, strlen(pw_pattern), path) > 0 ||
-    (pattern != NULL && match_prefix(pattern, strlen(pattern), path) > 0);
+  return (pattern != NULL && match_prefix(pattern, strlen(pattern), path) > 0);
 }
 
 static int scan_directory(struct connection *conn, const char *dir,
@@ -2267,9 +2236,6 @@ static void mg_url_encode(const char *src, char *dst, size_t dst_len) {
 
   *dst = '\0';
 }
-#endif  // !NO_DIRECTORY_LISTING || !NO_DAV
-
-#ifndef NO_DIRECTORY_LISTING
 
 static void print_dir_entry(const struct dir_entry *de) {
   char size[64], mod[64], href[MAX_PATH_SIZE * 3], chunk[MAX_PATH_SIZE * 4];
@@ -2365,9 +2331,8 @@ static void send_directory_listing(struct connection *conn, const char *dir) {
   write_terminating_chunk(conn);
   close_local_endpoint(conn);
 }
-#endif  // NO_DIRECTORY_LISTING
 
-#ifndef NO_DAV
+#if 0
 static void print_props(struct connection *conn, const char *uri,
                         file_stat_t *stp) {
   char mtime[64], buf[MAX_PATH_SIZE + 200];
@@ -2552,7 +2517,7 @@ static void forward_put_data(struct connection *conn) {
     }
   }
 }
-#endif //  NO_DAV
+#endif
 
 static void send_options(struct connection *conn) {
   static const char reply[] = "HTTP/1.1 200 OK\r\nAllow: GET, POST, HEAD, "
@@ -2561,7 +2526,7 @@ static void send_options(struct connection *conn) {
   conn->flags |= CONN_SPOOL_DONE;
 }
 
-#ifndef NO_AUTH
+#if 0
 void mg_send_digest_auth_request(struct mg_connection *c) {
   struct connection *conn = (struct connection *) c;
   c->status_code = 401;
@@ -2904,7 +2869,7 @@ static int is_dav_mutation(const struct connection *conn) {
   return s && (!strcmp(s, "PUT") || !strcmp(s, "DELETE") ||
                !strcmp(s, "MKCOL"));
 }
-#endif // NO_AUTH
+#endif
 
 int parse_header(const char *str, int str_len, const char *var_name, char *buf,
                  size_t buf_size) {
@@ -2946,14 +2911,11 @@ int mg_parse_header(const char *s, const char *var_name, char *buf,
 
 static void open_local_endpoint(struct connection *conn, int skip_user) {
   const char *cl_hdr = mg_get_header(&conn->mg_conn, "Content-Length");
-#ifndef NO_FILESYSTEM
-  static const char lua_pat[] = LUA_SCRIPT_PATTERN;
   file_stat_t st;
   char path[MAX_PATH_SIZE];
   int exists = 0, is_directory = 0;
   const char *cgi_pat = conn->server->config_options[CGI_PATTERN];
   const char *dir_lst = conn->server->config_options[ENABLE_DIRECTORY_LISTING];
-#endif
 
   conn->mg_conn.content_len = cl_hdr == NULL ? 0 : (int) to64(cl_hdr);
 
@@ -2973,9 +2935,6 @@ static void open_local_endpoint(struct connection *conn, int skip_user) {
     return;
   }
 
-#ifdef NO_FILESYSTEM
-  send_http_error(conn, 404, NULL);
-#else
   exists = convert_uri_to_file_name(conn, path, sizeof(path), &st);
   is_directory = S_ISDIR(st.st_mode);
 
@@ -2983,13 +2942,13 @@ static void open_local_endpoint(struct connection *conn, int skip_user) {
     send_options(conn);
   } else if (conn->server->config_options[DOCUMENT_ROOT] == NULL) {
     send_http_error(conn, 404, NULL);
-#ifndef NO_AUTH
+#if 0
   } else if ((!is_dav_mutation(conn) && !is_authorized(conn, path)) ||
              (is_dav_mutation(conn) && !is_authorized_for_dav(conn))) {
     mg_send_digest_auth_request(&conn->mg_conn);
     close_local_endpoint(conn);
 #endif
-#ifndef NO_DAV
+#if 0
   } else if (!strcmp(conn->mg_conn.request_method, "PROPFIND")) {
     handle_propfind(conn, path, &st);
   } else if (!strcmp(conn->mg_conn.request_method, "MKCOL")) {
@@ -3009,26 +2968,12 @@ static void open_local_endpoint(struct connection *conn, int skip_user) {
     close_local_endpoint(conn);
   } else if (is_directory && !find_index_file(conn, path, sizeof(path), &st)) {
     if (!mg_strcasecmp(dir_lst, "yes")) {
-#ifndef NO_DIRECTORY_LISTING
       send_directory_listing(conn, path);
-#else
-      send_http_error(conn, 501, NULL);
-#endif
     } else {
       send_http_error(conn, 403, NULL);
     }
-  } else if (match_prefix(lua_pat, sizeof(lua_pat) - 1, path) > 0) {
-#ifdef USE_LUA
-    handle_lsp_request(conn, path, &st);
-#else
-    send_http_error(conn, 501, NULL);
-#endif
   } else if (match_prefix(cgi_pat, strlen(cgi_pat), path) > 0) {
-#if !defined(NO_CGI)
     open_cgi_endpoint(conn, path);
-#else
-    send_http_error(conn, 501, NULL);
-#endif // !NO_CGI
   } else if (is_not_modified(conn, &st)) {
     send_http_error(conn, 304, NULL);
   } else if ((conn->endpoint.fd = open(path, O_RDONLY | O_BINARY)) != -1) {
@@ -3038,7 +2983,6 @@ static void open_local_endpoint(struct connection *conn, int skip_user) {
   } else {
     send_http_error(conn, 404, NULL);
   }
-#endif  // NO_FILESYSTEM
 }
 
 static void send_continue_if_expected(struct connection *conn) {
@@ -3090,16 +3034,13 @@ static void process_request(struct connection *conn) {
     send_continue_if_expected(conn);
     open_local_endpoint(conn, 0);
   }
-
-#ifndef NO_CGI
   if (conn->endpoint_type == EP_CGI && io->len > 0) {
     forward_post_data(conn);
   }
-#endif
   if (conn->endpoint_type == EP_USER) {
     call_request_handler_if_data_is_buffered(conn);
   }
-#ifndef NO_DAV
+#if 0
   if (conn->endpoint_type == EP_PUT && io->len > 0) {
     forward_put_data(conn);
   }
@@ -3351,12 +3292,10 @@ unsigned int mg_poll_server(struct mg_server *server, int milliseconds) {
         conn->last_activity_time = current_time;
         read_from_socket(conn);
       }
-#ifndef NO_CGI
       if (conn->endpoint_type == EP_CGI &&
           FD_ISSET(conn->endpoint.cgi_sock, &read_set)) {
         read_from_cgi(conn);
       }
-#endif
       if (FD_ISSET(conn->client_sock, &write_set) &&
           !(conn->flags & CONN_BUFFER)) {
         conn->last_activity_time = current_time;
@@ -3375,7 +3314,6 @@ unsigned int mg_poll_server(struct mg_server *server, int milliseconds) {
       close_conn(conn);
     }
   }
-
   return (unsigned int) current_time;
 }
 
@@ -3456,7 +3394,6 @@ static int get_var(const char *data, size_t data_len, const char *name,
       }
     }
   }
-
   return len;
 }
 
@@ -3511,7 +3448,6 @@ int mg_parse_multipart(const char *buf, int buf_len,
       return pos;
     }
   }
-
   return 0;
 }
 
