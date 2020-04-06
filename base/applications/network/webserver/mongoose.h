@@ -65,7 +65,7 @@ struct mg_server *mg_create_server(void *server_param);
 void mg_destroy_server(struct mg_server **);
 const char *mg_set_option(struct mg_server *, const char *opt, const char *val);
 unsigned int mg_poll_server(struct mg_server *, int milliseconds);
-void mg_add_uri_handler(struct mg_server *, const char *uri, mg_handler_t);
+void mg_set_request_handler(struct mg_server *, mg_handler_t);
 void mg_set_http_error_handler(struct mg_server *, mg_handler_t);
 const char **mg_get_valid_option_names(void);
 const char *mg_get_option(const struct mg_server *server, const char *name);
@@ -101,7 +101,11 @@ int mg_parse_multipart(const char *buf, int buf_len,
 void *mg_start_thread(void *(*func)(void *), void *param);
 char *mg_md5(char buf[33], ...);
 int mg_authorize_digest(struct mg_connection *c, FILE *fp);
-void mg_send_digest_auth_request(struct mg_connection *conn);
+// Callback function return codes
+enum { MG_REQUEST_NOT_PROCESSED, MG_REQUEST_PROCESSED, MG_REQUEST_CALL_AGAIN };
+enum { MG_AUTH_FAIL, MG_AUTH_OK };
+enum { MG_ERROR_NOT_PROCESSED, MG_ERROR_PROCESSED };
+enum { MG_CLIENT_CONTINUE, MG_CLIENT_CLOSE };
 
 #ifdef __cplusplus
 }
