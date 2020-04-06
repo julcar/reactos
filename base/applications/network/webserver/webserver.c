@@ -64,8 +64,6 @@ static int exit_flag;
 static char server_name[40];        // Set by init_server_name()
 static char config_file[PATH_MAX];  // Set by process_command_line_arguments()
 static struct mg_server *server;    // Set by start_mongoose()
-static const char static_user_name[64] = "#__u__#";
-static const char static_user_email[64] = "#__e__#";
 
 #if !defined(CONFIG_FILE)
 #define CONFIG_FILE "mongoose.conf"
@@ -711,7 +709,7 @@ static void show_settings_dialog() {
               WIDTH - 140, y, 65, 12, "Reset to defaults");
   add_control(&p, dia, 0x82, ID_STATIC,
               WS_CHILD | WS_VISIBLE | WS_DISABLED,
-              5, y, 180, 12, static_user_name);
+              5, y, 180, 12, server_name);
 
   dia->cy = ((nelems + 1) / 2 + 1) * HEIGHT + 30;
   DialogBoxIndirectParam(NULL, dia, NULL, DlgProc, (LPARAM) NULL);
