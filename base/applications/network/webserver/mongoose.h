@@ -102,8 +102,6 @@ void *mg_start_thread(void *(*func)(void *), void *param);
 char *mg_md5(char buf[33], ...);
 int mg_authorize_digest(struct mg_connection *c, FILE *fp);
 void mg_send_digest_auth_request(struct mg_connection *conn);
-typedef struct _stati64 cs_stat_t;
-int _wstati64(const wchar_t *path, cs_stat_t *st);
 
 #ifdef __cplusplus
 }

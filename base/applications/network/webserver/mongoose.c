@@ -53,6 +53,7 @@ typedef unsigned __int64 uint64_t;
 typedef __int64   int64_t;
 typedef CRITICAL_SECTION mutex_t;
 typedef struct _stati64 file_stat_t;
+int _wstati64(const wchar_t *path, file_stat_t *st);
 #define snprintf _snprintf
 #define vsnprintf _vsnprintf
 #define INT64_FMT  "I64d"
