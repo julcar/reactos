@@ -60,6 +60,9 @@ int _wstati64(const wchar_t *path, file_stat_t *st);
 #ifndef EINPROGRESS
 #define EINPROGRESS WSAEINPROGRESS
 #endif
+#ifndef EWOULDBLOCK
+#define EWOULDBLOCK WSAEWOULDBLOCK
+#endif
 #define mutex_init(x) InitializeCriticalSection(x)
 #define mutex_destroy(x) DeleteCriticalSection(x)
 #define mutex_lock(x) EnterCriticalSection(x)
@@ -246,6 +249,7 @@ struct mg_server {
   struct ll uri_handlers;
   mg_handler_t error_handler;
   char *config_options[NUM_OPTIONS];
+  char local_ip[48];
   void *server_data;
   void *ssl_ctx;    // SSL context
   sock_t ctl[2];    // Control socketpair. Used to wake up from select() call
@@ -730,7 +734,11 @@ static int mg_socketpair(sock_t sp[2]) {
 }
 
 static int is_error(int n) {
-  return n == 0 || (n < 0 && errno != EINTR && errno != EAGAIN);
+  return n == 0 ||
+    (n < 0 && errno != EINTR && errno != EINPROGRESS &&
+     errno != EAGAIN && errno != EWOULDBLOCK
+     && WSAGetLastError() != WSAEINTR && WSAGetLastError() != WSAEWOULDBLOCK
+    );
 }
 
 #ifndef NO_CGI
@@ -1094,13 +1102,18 @@ static void forward_post_data(struct connection *conn) {
 
 // 'sa' must be an initialized address to bind to
 static sock_t open_listening_socket(union socket_address *sa) {
+  socklen_t len = sizeof(*sa);
   sock_t on = 1, sock = INVALID_SOCKET;
 
-  if ((sock = socket(sa->sa.sa_family, SOCK_STREAM, 6)) == INVALID_SOCKET ||
-      setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void *) &on, sizeof(on)) ||
-      bind(sock, &sa->sa, sa->sa.sa_family == AF_INET ?
-           sizeof(sa->sin) : sizeof(sa->sa)) != 0 ||
-      listen(sock, SOMAXCONN) != 0) {
+  if ((sock = socket(sa->sa.sa_family, SOCK_STREAM, 6)) != INVALID_SOCKET &&
+      !setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void *) &on, sizeof(on)) &&
+      !bind(sock, &sa->sa, sa->sa.sa_family == AF_INET ?
+            sizeof(sa->sin) : sizeof(sa->sa)) &&
+      !listen(sock, SOMAXCONN)) {
+    set_non_blocking_mode(sock);
+    // In case port was set to 0, get the real port number
+    (void) getsockname(sock, &sa->sa, &len);
+  } else if (sock != INVALID_SOCKET) {
     closesocket(sock);
     sock = INVALID_SOCKET;
   }
@@ -1207,6 +1220,8 @@ static struct connection *accept_new_connection(struct mg_server *server) {
                        sizeof(conn->mg_conn.remote_ip), &sa);
     conn->mg_conn.remote_port = ntohs(sa.sin.sin_port);
     conn->mg_conn.server_param = server->server_data;
+    conn->mg_conn.local_ip = server->local_ip;
+    conn->mg_conn.local_port = ntohs(server->lsa.sin.sin_port);
     LINKED_LIST_ADD_TO_FRONT(&server->active_connections, &conn->link);
     //DBG(("added conn %p", conn));
   }
@@ -3202,6 +3217,7 @@ static void gobble_prior_post_data(struct iobuf *io, int len) {
 }
 
 static void close_local_endpoint(struct connection *conn) {
+  struct mg_connection *c = &conn->mg_conn;
   // Must be done before free()
   int keep_alive = should_keep_alive(&conn->mg_conn) &&
     (conn->endpoint_type == EP_FILE || conn->endpoint_type == EP_USER);
@@ -3214,7 +3230,8 @@ static void close_local_endpoint(struct connection *conn) {
   }
 
 #ifndef NO_LOGGING
-  if (conn->mg_conn.status_code != 400) {
+  if (c->status_code > 0 && conn->endpoint_type != EP_CLIENT &&
+      c->status_code != 400) {
     log_access(conn, conn->server->config_options[ACCESS_LOG_FILE]);
   }
 #endif
@@ -3224,8 +3241,9 @@ static void close_local_endpoint(struct connection *conn) {
   }
 
   conn->endpoint_type = EP_NONE;
-  conn->flags = 0;
-  conn->cl = conn->num_bytes_sent = conn->request_len = 0;
+  conn->cl = conn->num_bytes_sent = conn->request_len = conn->flags = 0;
+  c->request_method = c->uri = c->http_version = c->query_string = NULL;
+  c->num_headers = c->status_code = c->is_websocket = c->content_len = 0;
   free(conn->request);
   conn->request = NULL;
 
@@ -3393,7 +3411,7 @@ void mg_add_uri_handler(struct mg_server *server, const char *uri,
                         mg_handler_t handler) {
   struct uri_handler *p = (struct uri_handler *) malloc(sizeof(*p));
   if (p != NULL) {
-    LINKED_LIST_ADD_TO_FRONT(&server->uri_handlers, &p->link);
+    LINKED_LIST_ADD_TO_TAIL(&server->uri_handlers, &p->link);
     p->uri = mg_strdup(uri);
     p->handler = handler;
   }
@@ -3560,7 +3578,7 @@ static int parse_port_string(const char *str, union socket_address *sa) {
     port = 0;   // Parsing failure. Make port invalid.
   }
 
-  return port > 0 && port < 0xffff && str[len] == '\0';
+  return port <= 0xffff && str[len] == '\0';
 }
 
 const char *mg_set_option(struct mg_server *server, const char *name,
@@ -3586,7 +3604,15 @@ const char *mg_set_option(struct mg_server *server, const char *name,
       if (server->listening_sock == INVALID_SOCKET) {
         error_msg = "Cannot bind to port";
       } else {
-        set_non_blocking_mode(server->listening_sock);
+        sockaddr_to_string(server->local_ip, sizeof(server->local_ip),
+                           &server->lsa);
+        if (!strcmp(value, "0")) {
+          char buf[10];
+          mg_snprintf(buf, sizeof(buf), "%d",
+                      (int) ntohs(server->lsa.sin.sin_port));
+          free(server->config_options[ind]);
+          server->config_options[ind] = mg_strdup(buf);
+        }
       }
 #ifdef USE_SSL
     } else if (ind == SSL_CERTIFICATE) {
