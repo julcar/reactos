@@ -57,7 +57,9 @@ int _wstati64(const wchar_t *path, file_stat_t *st);
 #define snprintf _snprintf
 #define vsnprintf _vsnprintf
 #define INT64_FMT  "I64d"
-//#define EINPROGRESS WSAEINPROGRESS
+#ifndef EINPROGRESS
+#define EINPROGRESS WSAEINPROGRESS
+#endif
 #define mutex_init(x) InitializeCriticalSection(x)
 #define mutex_destroy(x) DeleteCriticalSection(x)
 #define mutex_lock(x) EnterCriticalSection(x)
@@ -194,6 +196,7 @@ enum {
   CGI_PATTERN, DAV_AUTH_FILE, DOCUMENT_ROOT, ENABLE_DIRECTORY_LISTING,
 #endif
   EXTRA_MIME_TYPES,
+  DEFAULT_MIME_TYPE,
 #ifndef NO_FILESYSTEM
   GLOBAL_AUTH_FILE,
 #endif
@@ -220,6 +223,7 @@ static const char *static_config_options[] = {
   "enable_directory_listing", "yes",
 #endif
   "extra_mime_types", NULL,
+  "default_mime_type", "text/plain",
 #ifndef NO_FILESYSTEM
   "global_auth_file", NULL,
 #endif
@@ -614,7 +618,7 @@ static void send_http_error(struct connection *conn, int code,
   if (fmt != NULL) {
     body[body_len++] = '\n';
     va_start(ap, fmt);
-    body_len += mg_snprintf(body + body_len, sizeof(body) - body_len, fmt, ap);
+    body_len += mg_vsnprintf(body + body_len, sizeof(body) - body_len, fmt, ap);
     va_end(ap);
   }
   if (code >= 300 && code <= 399) {
@@ -1803,7 +1807,7 @@ static void call_uri_handler(struct connection *conn) {
   }
 }
 
-static void write_to_client(struct connection *conn) {
+static void write_to_socket(struct connection *conn) {
   struct iobuf *io = &conn->remote_iobuf;
   int n = conn->ssl == NULL ? send(conn->client_sock, io->buf, io->len, 0) :
 #ifdef USE_SSL
@@ -1828,7 +1832,7 @@ static void write_to_client(struct connection *conn) {
   }
 }
 
-const char *mg_get_mime_type(const char *path) {
+const char *mg_get_mime_type(struct mg_server *server, const char *path) {
   const char *ext;
   size_t i, path_len;
 
@@ -1841,8 +1845,7 @@ const char *mg_get_mime_type(const char *path) {
       return static_builtin_mime_types[i].mime_type;
     }
   }
-
-  return "text/plain";
+  return server->config_options[DEFAULT_MIME_TYPE];
 }
 
 static struct uri_handler *find_uri_handler(struct mg_server *server,
@@ -1928,7 +1931,7 @@ static void get_mime_type(const struct mg_server *server, const char *path,
     }
   }
 
-  vec->ptr = mg_get_mime_type(path);
+  vec->ptr = mg_get_mime_type((struct mg_server *)server, path);
   vec->len = strlen(vec->ptr);
 }
 
@@ -2080,7 +2083,7 @@ static void call_uri_handler_if_data_is_buffered(struct connection *conn) {
     do { } while (deliver_websocket_frame(conn));
   } else
 #endif
-  if (loc->len >= c->content_len) {
+  if ((size_t) loc->len >= c->content_len) {
     call_uri_handler(conn);
   }
 }
@@ -3078,30 +3081,43 @@ static void process_request(struct connection *conn) {
 #endif
 }
 
-static void read_from_client(struct connection *conn) {
+static void read_from_socket(struct connection *conn) {
   char buf[IOBUF_SIZE];
-  int n = 0;
-  if (conn->ssl != NULL) {
-#ifdef USE_SSL
-    if (conn->flags & CONN_SSL_HANDS_SHAKEN) {
-      n = SSL_read(conn->ssl, buf, sizeof(buf));
-    } else {
-      if (SSL_accept(conn->ssl) == 1) {
-        conn->flags |= CONN_SSL_HANDS_SHAKEN;
-      }
-      return;
-    }
-#endif
-  } else {
-    n = recv(conn->client_sock, buf, sizeof(buf), 0);
-  }
+  int ok, n = 0;
+  socklen_t len = sizeof(ok);
 
-  //DBG(("%p %d", conn, n));
-  if (is_error(n)) {
-    conn->flags |= CONN_CLOSE;
-  } else if (n > 0) {
-    spool(&conn->local_iobuf, buf, n);
-    process_request(conn);
+  if (conn->endpoint_type == EP_CLIENT) {
+    conn->mg_conn.wsbits = 1;
+    if (!(conn->flags & CONN_CONNECTED) &&
+        getsockopt(conn->client_sock, SOL_SOCKET, SO_ERROR,
+                   (char *) &ok, &len) < 0) {
+      conn->mg_conn.wsbits = 0;
+    }
+    conn->handler(&conn->mg_conn);
+    conn->flags |= CONN_CLOSE | CONN_CONNECTED;
+  } else {
+    if (conn->ssl != NULL) {
+#ifdef USE_SSL
+      if (conn->flags & CONN_SSL_HANDS_SHAKEN) {
+        n = SSL_read(conn->ssl, buf, sizeof(buf));
+      } else {
+        if (SSL_accept(conn->ssl) == 1) {
+          conn->flags |= CONN_SSL_HANDS_SHAKEN;
+        }
+        return;
+      }
+#endif
+    } else {
+      n = recv(conn->client_sock, buf, sizeof(buf), 0);
+    }
+
+    //DBG(("%p %d", conn, n));
+    if (is_error(n)) {
+      conn->flags |= CONN_CLOSE;
+    } else if (n > 0) {
+      spool(&conn->local_iobuf, buf, n);
+      process_request(conn);
+    }
   }
 }
 
@@ -3137,19 +3153,6 @@ struct mg_connection *mg_connect(struct mg_server *server, const char *host,
   LINKED_LIST_ADD_TO_FRONT(&server->active_connections, &conn->link);
 
   return &conn->mg_conn;
-}
-
-static void read_from_server(struct connection *conn) {
-  sock_t ok, sock = conn->client_sock;
-  socklen_t len = sizeof(ok);
-
-  conn->mg_conn.wsbits = 1;
-  if (!(conn->flags & CONN_CONNECTED) &&
-      getsockopt(sock, SOL_SOCKET, SO_ERROR, (char *) &ok, &len) < 0) {
-    conn->mg_conn.wsbits = 0;
-  }
-  conn->handler(&conn->mg_conn);
-  conn->flags |= CONN_CLOSE | CONN_CONNECTED;
 }
 
 #ifndef NO_LOGGING
@@ -3318,11 +3321,7 @@ unsigned int mg_poll_server(struct mg_server *server, int milliseconds) {
       conn = LINKED_LIST_ENTRY(lp, struct connection, link);
       if (FD_ISSET(conn->client_sock, &read_set)) {
         conn->last_activity_time = current_time;
-        if (conn->endpoint_type == EP_CLIENT) {
-          read_from_server(conn);
-        } else {
-          read_from_client(conn);
-        }
+        read_from_socket(conn);
       }
 #ifndef NO_CGI
       if (conn->endpoint_type == EP_CGI &&
@@ -3333,11 +3332,7 @@ unsigned int mg_poll_server(struct mg_server *server, int milliseconds) {
       if (FD_ISSET(conn->client_sock, &write_set) &&
           !(conn->flags & CONN_BUFFER)) {
         conn->last_activity_time = current_time;
-        write_to_client(conn);
-      }
-      if (conn->flags & CONN_LONG_RUNNING) {
-        conn->mg_conn.wsbits = conn->flags & CONN_CLOSE ? 1 : 0;
-        call_uri_handler(conn);
+        write_to_socket(conn);
       }
     }
   }
