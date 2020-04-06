@@ -183,15 +183,12 @@ struct dir_entry {
 enum {
   ACCESS_CONTROL_LIST,
   ACCESS_LOG_FILE,
-  AUTH_DOMAIN,
   CGI_INTERPRETER,
   CGI_PATTERN,
-  DAV_AUTH_FILE,
   DOCUMENT_ROOT,
   ENABLE_DIRECTORY_LISTING,
   EXTRA_MIME_TYPES,
   DEFAULT_MIME_TYPE,
-  GLOBAL_AUTH_FILE,
   HIDE_FILES_PATTERN,
   INDEX_FILES,
   LISTENING_PORT,
@@ -205,15 +202,12 @@ enum {
 static const char *static_config_options[] = {
   "access_control_list", NULL,
   "access_log_file", NULL,
-  "auth_domain", "mydomain.com",
   "cgi_interpreter", NULL,
   "cgi_pattern", "**.cgi$|**.pl$|**.php$",
-  "dav_auth_file", NULL,
   "document_root",  NULL,
   "enable_directory_listing", "yes",
   "extra_mime_types", NULL,
   "default_mime_type", "text/plain",
-  "global_auth_file", NULL,
   "hide_files_patterns", NULL,
   "index_files","index.html,index.htm,index.cgi,index.php",
   "listening_port", NULL,
@@ -920,13 +914,12 @@ static void prepare_cgi_environment(struct connection *conn,
   blk->len = blk->nvars = 0;
   blk->conn = ri;
 
-  if ((s = getenv("SERVER_NAME")) != NULL) {
+  if ((s = getenv("COMPUTER_NAME")) != NULL) {
     addenv(blk, "SERVER_NAME=%s", s);
   } else {
     addenv(blk, "SERVER_NAME=%s", conn->server->local_ip);
   }
 
-  addenv(blk, "SERVER_NAME=%s", opts[AUTH_DOMAIN]);
   addenv(blk, "SERVER_ROOT=%s", opts[DOCUMENT_ROOT]);
   addenv(blk, "DOCUMENT_ROOT=%s", opts[DOCUMENT_ROOT]);
   addenv(blk, "SERVER_SOFTWARE=%s/%s", "Mongoose", MONGOOSE_VERSION);

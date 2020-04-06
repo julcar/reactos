@@ -462,8 +462,6 @@ static int is_boolean_option(const char *option_name) {
 
 static int is_filename_option(const char *option_name) {
   return !strcmp(option_name, "cgi_interpreter") ||
-    !strcmp(option_name, "global_auth_file") ||
-    !strcmp(option_name, "dav_auth_file") ||
     !strcmp(option_name, "access_log_file") ||
     !strcmp(option_name, "error_log_file") ||
     !strcmp(option_name, "ssl_certificate");
