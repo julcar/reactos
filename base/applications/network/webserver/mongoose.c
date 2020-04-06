@@ -44,7 +44,9 @@
 #include <io.h>         // For _lseeki64
 #include <direct.h>     // For _mkdir
 typedef int socklen_t;
+//#ifndef pid_t
 //typedef HANDLE pid_t;
+//#endif
 typedef SOCKET sock_t;
 typedef unsigned char uint8_t;
 typedef unsigned int uint32_t;
@@ -68,7 +70,9 @@ int _wstati64(const wchar_t *path, file_stat_t *st);
 #define mutex_lock(x) EnterCriticalSection(x)
 #define mutex_unlock(x) LeaveCriticalSection(x)
 #define get_thread_id() ((unsigned long) GetCurrentThreadId())
-//#define S_ISDIR(x) ((x) & _S_IFDIR)
+#ifndef S_ISDIR
+#define S_ISDIR(x) ((x) & _S_IFDIR)
+#endif
 #define sleep(x) Sleep((x) * 1000)
 #define stat(x, y) mg_stat((x), (y))
 #define fopen(x, y) mg_fopen((x), (y))
@@ -1421,10 +1425,10 @@ static int match_prefix(const char *pattern, int pattern_len, const char *str) {
 static int convert_uri_to_file_name(struct connection *conn, char *buf,
                                     size_t buf_len, file_stat_t *st) {
   struct vec a, b;
-  const char *rewrites = conn->server->config_options[URL_REWRITES],
-        *root = conn->server->config_options[DOCUMENT_ROOT],
-        *cgi_pat = conn->server->config_options[CGI_PATTERN],
-        *uri = conn->mg_conn.uri;
+  const char *rewrites = conn->server->config_options[URL_REWRITES];
+  const char *root = conn->server->config_options[DOCUMENT_ROOT];
+  const char *cgi_pat = conn->server->config_options[CGI_PATTERN];
+  const char *uri = conn->mg_conn.uri;
   char *p;
   int match_len;
 
@@ -2460,7 +2464,7 @@ static int remove_directory(const char *dir) {
 static void handle_delete(struct connection *conn, const char *path) {
   file_stat_t st;
 
-  if (!stat(path, &st)) {
+  if (stat(path, &st) != 0) {
     send_http_error(conn, 404, NULL);
   } else if (S_ISDIR(st.st_mode)) {
     remove_directory(path);
