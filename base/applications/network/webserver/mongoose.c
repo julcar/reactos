@@ -2940,8 +2940,6 @@ static void open_local_endpoint(struct connection *conn, int skip_user) {
              (is_dav_mutation(conn) && !is_authorized_for_dav(conn))) {
     mg_send_digest_auth_request(&conn->mg_conn);
     close_local_endpoint(conn);
-#endif
-#if 0
   } else if (!strcmp(conn->mg_conn.request_method, "PROPFIND")) {
     handle_propfind(conn, path, &st);
   } else if (!strcmp(conn->mg_conn.request_method, "MKCOL")) {
