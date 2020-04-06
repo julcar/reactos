@@ -914,7 +914,7 @@ static void prepare_cgi_environment(struct connection *conn,
   blk->len = blk->nvars = 0;
   blk->conn = ri;
 
-  if ((s = getenv("COMPUTER_NAME")) != NULL) {
+  if ((s = getenv("COMPUTERNAME")) != NULL) {
     addenv(blk, "SERVER_NAME=%s", s);
   } else {
     addenv(blk, "SERVER_NAME=%s", conn->server->local_ip);
