@@ -938,6 +938,12 @@ static void prepare_cgi_environment(struct connection *conn,
   blk->len = blk->nvars = 0;
   blk->conn = ri;
 
+  if ((s = getenv("SERVER_NAME")) != NULL) {
+    addenv(blk, "SERVER_NAME=%s", s);
+  } else {
+    addenv(blk, "SERVER_NAME=%s", conn->server->local_ip);
+  }
+
   addenv(blk, "SERVER_NAME=%s", opts[AUTH_DOMAIN]);
   addenv(blk, "SERVER_ROOT=%s", opts[DOCUMENT_ROOT]);
   addenv(blk, "DOCUMENT_ROOT=%s", opts[DOCUMENT_ROOT]);
@@ -985,6 +991,8 @@ static void prepare_cgi_environment(struct connection *conn,
     addenv(blk, "CONTENT_LENGTH=%s", s);
 
   addenv2(blk, "PATH");
+  addenv2(blk, "TMP");
+  addenv2(blk, "TEMP");
   addenv2(blk, "PERLLIB");
   addenv2(blk, ENV_EXPORT_TO_CGI);
 
@@ -1020,16 +1028,17 @@ static const char cgi_status[] = "HTTP/1.1 200 OK\r\n";
 
 static void open_cgi_endpoint(struct connection *conn, const char *prog) {
   struct cgi_env_block blk;
-  char dir[MAX_PATH_SIZE];
+  char dir[MAX_PATH_SIZE], *p;
   sock_t fds[2];
 
   prepare_cgi_environment(conn, prog, &blk);
   // CGI must be executed in its own directory. 'dir' must point to the
   // directory containing executable program, 'p' must point to the
   // executable program name relative to 'dir'.
-  mg_snprintf(dir, sizeof(dir), "%s", prog);
-  if (strrchr(dir, '/') == NULL) {
+  if ((p = strrchr(prog, '/')) == NULL) {
     mg_snprintf(dir, sizeof(dir), "%s", ".");
+  } else {
+    mg_snprintf(dir, sizeof(dir), "%.*s", (int) (p - prog), prog);
   }
 
   // Try to create socketpair in a loop until success. mg_socketpair()
