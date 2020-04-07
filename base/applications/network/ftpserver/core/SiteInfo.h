@@ -123,11 +123,11 @@ public:
     virtual void FreePWInfo(siteinfoPWInfo_t *pwinfo);
 
         //permissions functions
-    virtual int CheckPermissions(char *username, char *path, char *pflags);
+    virtual int CheckPermissions(const char *username, const char *path, const char *pflags);
 
         //path functions
     virtual char *BuildPathRoot(char *subdir, char *filename = NULL);
-    virtual char *BuildPathHome(char *subdir, char *filename = NULL);
+    virtual char *BuildPathHome(const char *subdir, char *filename = NULL);
     virtual void FreePath(char *path);
 
         //logging functions
@@ -135,11 +135,11 @@ public:
     virtual void SetProgLoggingLevel(int level);
     virtual void SetProgLogFormatStr(char *formatstr);
     virtual int SetProgLogName(char *logfile, char *basepath = NULL);
-    virtual int WriteToProgLog(char *subsystem, char *msgformat, ...);
+    virtual int WriteToProgLog(const char *subsystem, const char *msgformat, ...);
     virtual void SetAccessLoggingLevel(int level);
     virtual void SetAccessLogFormatStr(char *formatstr);
     virtual int SetAccessLogName(char *logfile, char *basepath = NULL);
-    virtual int WriteToAccessLog(char *sip, char *sp, char *cip, char *cp, char *user, char *cmd, char *arg, char *status, char *text);
+    virtual int WriteToAccessLog(char *sip, char *sp, char *cip, char *cp, char *user, char *cmd, char *arg, const char *status, const char *text);
 
         //FTP data connection functions
     virtual int SetDataPortRange(unsigned short startport, unsigned short endport);
@@ -177,7 +177,7 @@ public:
     virtual int GetPrivKeyPW(char *pwbuff, int maxpwbuff);
 
         //time functions
-    char *GetTimeString(char *buffer, int maxsize, char *formatstring, long ctime = 0, int flaggmt = 0);
+    char *GetTimeString(char *buffer, int maxsize, const char *formatstring, long ctime = 0, int flaggmt = 0);
     struct tm *GetTimeR(long ctime, struct tm *tmoutput, int flaggmt);
     int GetGMTOffsetMinutes();
     int GetGMTHour(int localhour, int gmtoffsetmin);

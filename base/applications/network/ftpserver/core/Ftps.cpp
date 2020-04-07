@@ -865,7 +865,7 @@ int CFtps::DoOPTS(int argc, char **argv)
 int CFtps::DoPASS(int argc, char **argv)
 {
     CFSUtils fsutils;
-    CCrypto crypto;
+    //CCrypto crypto;
     CTimer timer;
     char *pwdec, *tmppath, password[FTPS_MAXPWSIZE+1] = "";
     siteinfoPWInfo_t *pwinfo;
@@ -888,14 +888,16 @@ int CFtps::DoPASS(int argc, char **argv)
             //if anonymous, don't check password
         if (atol(pwinfo->groupnumber) != SITEINFO_ANONYMOUSGROUPNUM) {
 #if 0
-            if ( (pwdec = crypto.DecryptHexStr(pwinfo->passwordraw,m_login,password)) != NULL ) {
-#else
-            pwdec = pwinfo->passwordraw;
-#endif
+            if ((pwdec = crypto.DecryptHexStr(pwinfo->passwordraw,m_login,password)) != NULL) {
                 if (strcmp(pwdec,password) == 0)
                     flagauth = 1;   //the password is correct
                 crypto.FreeDataBuffer(pwdec);
             }
+#else
+            pwdec = pwinfo->passwordraw;
+            if (strcmp(pwdec,password) == 0)
+                flagauth = 1;   //the password is correct
+#endif
         } else {
             flagauth = 1;   //no password necessary for anonymous
         }
@@ -1942,7 +1944,7 @@ long CFtps::GetLastActive()
     //flagaccess determines if information will be written to the access log.
     //flagprog determines if information will be written to the program log.
     //respmode specifies what kind of response to send to the user (intermediate or final)
-int CFtps::EventHandler(int argc, char **argv, char *mesg, char *ftpcode, int flagclient, int flagaccess, int flagprog, int respmode /*=0*/)
+int CFtps::EventHandler(int argc, char **argv, const char *mesg, const char *ftpcode, int flagclient, int flagaccess, int flagprog, int respmode /*=0*/)
 {
     CCmdLine cmdline(0);
     char *cmdptr, *argptr, empty[] = "";
@@ -1979,7 +1981,7 @@ int CFtps::EventHandler(int argc, char **argv, char *mesg, char *ftpcode, int fl
 
     //Writes to m_linebuffer without exceeding FTPS_LINEBUFSIZE
     //This function works just like sprintf()
-int CFtps::WriteToLineBuffer(char *lineformat, ...)
+int CFtps::WriteToLineBuffer(const char *lineformat, ...)
 {
     va_list parg;
     int nchars;
@@ -2092,7 +2094,7 @@ void CFtps::DefaultResp(int argc, char **argv)
     //if flagdir != 0, the directory part of the path will be checked if the
     //full path does not exist.
     //path = m_userroot + m_cwd + arg
-int CFtps::CheckPermissions(char *cmd, char *arg, char *pflags, int flagdir /*=0*/)
+int CFtps::CheckPermissions(const char *cmd, char *arg, const char *pflags, int flagdir /*=0*/)
 {
     CFSUtils fsutils;
     char *path, *args[2];
@@ -2103,7 +2105,7 @@ int CFtps::CheckPermissions(char *cmd, char *arg, char *pflags, int flagdir /*=0
         return(0);
     }
 
-    args[0] = cmd; args[1] = arg;
+    args[0] = const_cast<char*>(cmd); args[1] = arg;
 
     if (arg != NULL) {
         if ((path = fsutils.BuildPath(m_userroot,m_cwd,arg)) != NULL) {

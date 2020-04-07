@@ -243,7 +243,7 @@ char *CSiteInfo::BuildPathRoot(char *subdir, char *filename /*=NULL*/)
 
     //builds a path in the default home directory for the site
     //Example home path: /usr/ftpserver/site/
-char *CSiteInfo::BuildPathHome(char *subdir, char *filename /*=NULL*/)
+char *CSiteInfo::BuildPathHome(const char *subdir, char *filename /*=NULL*/)
 {
     CFSUtils fsutils;
     char *path;
@@ -361,7 +361,7 @@ int CSiteInfo::SetProgLogName(char *logfile, char *basepath /*=NULL*/)
 }
 
     //Write a message to the program log file
-int CSiteInfo::WriteToProgLog(char *subsystem, char *msgformat, ...)
+int CSiteInfo::WriteToProgLog(const char *subsystem, const char *msgformat, ...)
 {
     va_list parg;
     char *buffer1, *buffer2, datebuffer[64];
@@ -513,7 +513,7 @@ int CSiteInfo::SetAccessLogName(char *logfile, char *basepath /*=NULL*/)
     
     //Write to the access log
     //NOTE: all fields that are NULL or empty are printed as "-" in the log file.
-int CSiteInfo::WriteToAccessLog(char *sip, char *sp, char *cip, char *cp, char *user, char *cmd, char *arg, char *status, char *text)
+int CSiteInfo::WriteToAccessLog(char *sip, char *sp, char *cip, char *cp, char *user, char *cmd, char *arg, const char *status, const char *text)
 {
     char *buffer, *buffer1, datebuffer[64];
 
@@ -615,7 +615,7 @@ char *CSiteInfo::BuildFullListLine(char *listline, int maxlinesize, char *filepa
 
     filetype = (finfo.mode & S_IFDIR) ? 'd' : '-';
 
-    GetTimeString(timestr,sizeof(timestr),(char *)"%Y %b %d %H:%M",finfo.timecreate);
+    GetTimeString(timestr,sizeof(timestr),"%Y %b %d %H:%M",finfo.timecreate);
     if ((ptr = strrchr(timestr,' ')) != NULL) {
         ptr++;
         if (thisyear != NULL) {
@@ -789,7 +789,7 @@ int CSiteInfo::GetPrivKeyPW(char *pwbuff, int maxpwbuff)
     //Loads "buffer" with the string version of the time (returns a pointer to buffer).
     //"formatstring" is the string that is passed to strftime().
     //If ctime = 0, the current time is used.  If flaggmt != 0 GMT time will be used (else localtime).
-char *CSiteInfo::GetTimeString(char *buffer, int maxsize, char *formatstring, long ctime /*=0*/, int flaggmt /*=0*/)
+char *CSiteInfo::GetTimeString(char *buffer, int maxsize, const char *formatstring, long ctime /*=0*/, int flaggmt /*=0*/)
 {
     struct tm *ltimeptr, ltime;
     struct timeb timebuffer;

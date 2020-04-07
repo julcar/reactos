@@ -532,7 +532,7 @@ static int _initserver(CIndiSiteInfo *psiteinfo, int argc, char **argv, char *bi
 {
     CIndiFileUtils fileutils;
     CStrUtils strutils;     //String utilities class
-    CCrypto crypto;         //Encryption/Decryption class
+    //CCrypto crypto;         //Encryption/Decryption class
     char *ptr, *pwenc, passwordbuffer[SITEINFO_MAXPWLINE];
     CFSUtils fsutils;       //File System Utilities class
     indisiteinfoUserProp_t userprop;

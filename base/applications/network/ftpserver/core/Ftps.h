@@ -130,16 +130,16 @@ public:
     long GetLastActive();
 
         //Used for logging and to send responses back to the FTP client
-    int EventHandler(int argc, char **argv, char *mesg, char *ftpcode, int flagclient, int flagaccess, int flagprog, int respmode = 0);
+    int EventHandler(int argc, char **argv, const char *mesg, const char *ftpcode, int flagclient, int flagaccess, int flagprog, int respmode = 0);
         //Used to build response lines to send back to the FTP client (writes to m_linebuffer)
-    int WriteToLineBuffer(char *lineformat, ...);
+    int WriteToLineBuffer(const char *lineformat, ...);
 
         //Used to parse the address in the format used in the PORT (and PASV) command
     static int ParsePORTAddr(char *rawaddr, char *addr, int maxaddr, char *port, int maxport);
 
 protected:
     void DefaultResp(int argc, char **argv);
-    int CheckPermissions(char *cmd, char *arg, char *pflags, int flagdir = 0);
+    int CheckPermissions(const char *cmd, char *arg, const char *pflags, int flagdir = 0);
 
 protected:
     CSiteInfo *m_psiteinfo;     //pointer to the class containing the site information
