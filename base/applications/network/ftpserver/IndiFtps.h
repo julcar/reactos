@@ -22,7 +22,7 @@
 #ifndef INDIFTPS_H
 #define INDIFTPS_H
 
-#include "../core/Ftps.h"
+#include "core/Ftps.h"
 
 class CIndiSiteInfo;
 

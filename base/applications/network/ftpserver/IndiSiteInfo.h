@@ -22,9 +22,9 @@
 #ifndef INDISITEINFO_H
 #define INDISITEINFO_H
 
-#include "../core/SiteInfo.h"
+#include "core/SiteInfo.h"
 
-#include "../core/Dll.h"
+#include "core/Dll.h"
 
 #define INDISITEINFO_MAXBINDATTEMPTS    3  //max number of ports to attempt to bind to
 
