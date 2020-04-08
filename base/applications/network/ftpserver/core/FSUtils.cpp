@@ -28,34 +28,12 @@
 #include <time.h>
 #include <sys/types.h>
 
-#ifdef WIN32
   #include <io.h>
   #include <direct.h>
   #include <sys/utime.h>
-#else
-  #include <glob.h>
-  #include <unistd.h>
-  #include <grp.h>  //for getgrgid
-  #include <pwd.h>  //for getpwuid
-  #include <utime.h>
-#endif
 
     //Needed for GetDiskInfo()
-#ifdef WIN32
   #include <Windows.h>
-#endif
-#ifdef SOLARIS
-  #include <sys/statvfs.h>
-#endif
-#ifdef BSD
-  #include <sys/param.h>
-  #include <sys/ucred.h>
-  #include <sys/mount.h>
-  #define fsbtoblk(num, fsbs, bs) (((fsbs) != 0 && (fsbs) < (bs)) ? (num) / ((bs) / (fsbs)) : (num) * ((fsbs) / (bs)))
-#endif
-#ifdef LINUX
-  #include <sys/vfs.h>
-#endif
 
 #include "StrUtils.h"
 #include "FSUtils.h"
@@ -114,7 +92,6 @@ long CFSUtils::DirGetFirstFile(const char *dirpath, char *filename, int maxfilen
 
     CheckSlash(dirpathbuff);        //make sure the path has correct slashes
 
-    #ifdef WIN32
       long hdir;
       struct _finddata_t fileinfo;
 
@@ -128,34 +105,6 @@ long CFSUtils::DirGetFirstFile(const char *dirpath, char *filename, int maxfilen
           strncpy(filename,fileinfo.name,maxfilename-1);
           *(filename+maxfilename-1) = '\0';
       }
-    #else
-      glob_t *pglob;
-
-      if ((pglob = new glob_t) == NULL) {
-          free(dirpathbuff);
-          return(0);
-      }
-      if (glob(dirpathbuff,0,NULL,pglob) != 0) {
-          delete pglob;
-          free(dirpathbuff);
-          return(0);
-      }
-        //No paths were matched
-      if (pglob->gl_pathc == 0) {
-          delete pglob;
-          free(dirpathbuff);
-          return(0);
-      }
-
-      handle = (long)pglob;
-      if (filename != NULL) {
-               //only copy the filename (not the path)
-          GetFileName(pglob->gl_pathv[0],strlen(pglob->gl_pathv[0])+1,pglob->gl_pathv[0]);
-          strncpy(filename,pglob->gl_pathv[0],maxfilename-1);
-          *(filename+maxfilename-1) = '\0';
-      }
-      pglob->gl_offs = 1;   //set the offset
-    #endif
 
     free(dirpathbuff);
     return(handle);
@@ -172,7 +121,6 @@ long CFSUtils::DirGetFirstFile(const char *dirpath, char *filename, int maxfilen
 //
 int CFSUtils::DirGetNextFile(long handle, char *filename, int maxfilename)
 {
-    #ifdef WIN32
       struct _finddata_t fileinfo;
 
       if (_findnext(handle,&fileinfo) == -1L)
@@ -181,19 +129,6 @@ int CFSUtils::DirGetNextFile(long handle, char *filename, int maxfilename)
           strncpy(filename,fileinfo.name,maxfilename-1);
           *(filename+maxfilename-1) = '\0';
       }
-    #else
-      glob_t *pglob = (glob_t *)handle;
-
-      if (pglob->gl_pathv[pglob->gl_offs] == NULL)
-          return(0);
-      if (filename != NULL) {
-               //only copy the filename (not the path)
-          GetFileName(pglob->gl_pathv[pglob->gl_offs],strlen(pglob->gl_pathv[pglob->gl_offs])+1,pglob->gl_pathv[pglob->gl_offs]);
-          strncpy(filename,pglob->gl_pathv[pglob->gl_offs],maxfilename-1);
-          *(filename+maxfilename-1) = '\0';
-      }
-      (pglob->gl_offs)++;   //increment the offset
-    #endif
 
     return(1);
 }
@@ -207,13 +142,7 @@ int CFSUtils::DirGetNextFile(long handle, char *filename, int maxfilename)
 //
 int CFSUtils::DirClose(long handle)
 {
-    #ifdef WIN32
       _findclose(handle);
-    #else
-      ((glob_t *)handle)->gl_offs = 0;  //reset the offset
-      globfree((glob_t *)handle);
-      delete (glob_t *)handle;
-    #endif
 
     return 1;
 }
@@ -274,19 +203,12 @@ int CFSUtils::GetFileStats(char *filepath, fsutilsFileInfo_t *infoptr)
         return(0);  //the filepath is empty
     }
 
-    #ifdef WIN32
       struct _stat filestatus;
       if (_stat(filepath,&filestatus) != 0) {
           if (flagslashend != 0) CheckSlashEnd(filepath,len+1); //restore the trailing slash
           return(0);
       }
-    #else
-      struct stat filestatus;
-      if (stat(filepath,&filestatus) != 0) {
-          if (flagslashend != 0) CheckSlashEnd(filepath,len+1); //restore the trailing slash
-          return(0);
-      }
-    #endif
+
     memset(infoptr,0,sizeof(fsutilsFileInfo_t));
     infoptr->timeaccess = filestatus.st_atime;
     infoptr->timecreate = filestatus.st_ctime;
@@ -322,19 +244,11 @@ int CFSUtils::SetFileTime(char *filepath, long timemod, long timeaccess /*=0*/)
         //by default set the access time to the modification time
     accesstime = (timeaccess == 0) ? timemod : timeaccess;
 
-    #ifdef WIN32
         struct _utimbuf utimebuffer;
         utimebuffer.modtime = timemod;
         utimebuffer.actime = accesstime;
         if (_utime(filepath,&utimebuffer) != 0)
             return(0);
-    #else
-        struct utimbuf utimebuffer;
-        utimebuffer.modtime = timemod;
-        utimebuffer.actime = accesstime;
-        if (utime(filepath,&utimebuffer) != 0)
-            return(0);
-    #endif
 
     return(1);
 }
@@ -353,16 +267,6 @@ int CFSUtils::GetUsrName(long uid, char *username, int maxusername)
 
     if (username == NULL || maxusername == 0)
         return(0);
-
-    #ifndef WIN32
-      struct passwd *pw;
-          
-      if ((pw = getpwuid(uid)) != NULL) {
-          strncpy(username,pw->pw_name,maxusername-1);
-          username[maxusername-1] = '\0';
-          return(1);
-      }
-    #endif
 
         //use generic user by default
     strncpy(username,"owner",maxusername-1);
@@ -386,15 +290,6 @@ int CFSUtils::GetGrpName(long gid, char *grpname, int maxgrpname)
     if (grpname == NULL || maxgrpname == 0)
         return(0);
 
-    #ifndef WIN32
-      struct group *grp;
-
-      if ((grp = getgrgid(gid)) != NULL) {
-          strncpy(grpname,grp->gr_name,maxgrpname-1);
-          grpname[maxgrpname-1] = '\0';
-          return(1);
-      }
-    #endif
 
         //use generic group by default
     strncpy(grpname,"group",maxgrpname-1);
@@ -620,11 +515,7 @@ int CFSUtils::CheckSlashEnd(char *path, int maxpathsize)
         return(0);  //path is not big enough
 
         //make sure the path ends in a '\' or '/'
-    #ifdef WIN32
       strcat(path,"\\");    //for Windows
-    #else
-      strcat(path,"/");     //for UNIX
-    #endif
 
     return(1);
 }
@@ -653,19 +544,12 @@ int CFSUtils::CheckSlash(char *outpath, const char *wrkdir /*=NULL*/)
     if (wrkdir != NULL)
         strcpy(outpath,wrkdir);
 
-        //convert all '/' to '\' for WINDOWS and '\' to '/' for UNIX
+        //convert all '/' to '\' for WINDOWS
     pathptr = outpath;
-    #ifdef WIN32
       while ((ptr = strchr(pathptr,'/')) != NULL) {
           *ptr = '\\';
           pathptr = ptr + 1;
       }
-    #else
-      while ((ptr = strchr(pathptr,'\\')) != NULL) {
-          *ptr = '/';
-          pathptr = ptr + 1;
-      }
-    #endif
 
     return(1);
 }
@@ -771,11 +655,7 @@ int CFSUtils::GetFileName(char *filename, int maxfilename, const char *fullpath)
         free(pathptr);
 
         //Do not allow any file names with '\' or '/' in it.
-    #ifdef WIN32
       if (strchr(filename,'/') != NULL || *filename == '\0')
-    #else
-      if (strchr(filename,'\\') != NULL || *filename == '\0')
-    #endif
         return(0);  //invalid filename
 
     return(1);
@@ -838,11 +718,7 @@ char *CFSUtils::GetRelPathPtr(char *fullpath, char *rootpath)
 {
 
         //make sure fullpath begins with userroot
-    #ifdef WIN32
       if (_strnicmp(fullpath,rootpath,strlen(rootpath)) != 0)   //case insensitive for Windows
-    #else
-      if (strncmp(fullpath,rootpath,strlen(rootpath)) != 0)     //case sensitive for UNIX
-    #endif
         return(NULL);   //fullpath does not start with rootpath
 
     return(fullpath + strlen(rootpath));
@@ -973,11 +849,7 @@ int CFSUtils::MkDir(const char *path)
     if (path == NULL)
         return(0);
 
-    #ifdef WIN32
       if (mkdir(path) == 0) {
-    #else
-      if (mkdir(path,0000755) == 0) {   //make dir w/permissions "rwxr-xr-x"
-    #endif
         return(1);  //dir successfully created
     } else {
         return(0);  //error creating the dir
@@ -1526,7 +1398,7 @@ int CFSUtils::GetDiskInfo(const char *fullpath, fsutilsDiskInfo_t *diskinfo)
         //initialize the disk info struct
     memset(diskinfo,0,sizeof(fsutilsDiskInfo_t));
 
-    #ifdef WIN32    // Windows
+      // Windows
       ULARGE_INTEGER freebytes, totalbytes, totalfreebytes;
       char buffer[4] = "C:\\";
       *buffer = *fullpath;
@@ -1535,40 +1407,6 @@ int CFSUtils::GetDiskInfo(const char *fullpath, fsutilsDiskInfo_t *diskinfo)
         diskinfo->totalbytes = (double)((totalbytes.HighPart * 4294967296) + totalbytes.LowPart);
         retval = 1;
       }
-    #endif
-    #ifdef BSD  // BSD
-      long i, mntsize, blocksize;
-      int headerlen, maxlen = 0;
-      struct statfs *mntbuf;
-      mntsize = getmntinfo(&mntbuf,MNT_NOWAIT);
-      for (i = 0; i < mntsize; i++) {
-          if (strncasecmp(mntbuf[i].f_mntonname,fullpath,strlen(mntbuf[i].f_mntonname)) == 0) {
-              if (strlen(mntbuf[i].f_mntonname) > (unsigned)maxlen) {
-                  getbsize(&headerlen,&blocksize);
-                  diskinfo->bytesfree = (double)fsbtoblk(mntbuf[i].f_bavail,mntbuf[i].f_bsize,blocksize) * (double)blocksize;
-                  diskinfo->totalbytes = (double)fsbtoblk(mntbuf[i].f_blocks,mntbuf[i].f_bsize,blocksize) * (double)blocksize;
-                  maxlen = strlen(mntbuf[i].f_mntonname);
-                  retval = 1;
-              }
-          }
-      }
-    #endif
-    #ifdef SOLARIS  // Solaris
-      statvfs_t buf;
-      if (statvfs(fullpath,&buf) == 0) {
-          diskinfo->bytesfree = (double)buf.f_bfree * (double)buf.f_frsize;
-          diskinfo->totalbytes = (double)buf.f_blocks * (double)buf.f_frsize;
-          retval = 1;
-      }
-    #endif
-    #ifdef LINUX    // Linux
-      struct statfs buf;
-      if (statfs(fullpath,&buf) == 0) {
-          diskinfo->bytesfree = (double)buf.f_bfree * (double)buf.f_bsize;
-          diskinfo->totalbytes = (double)buf.f_blocks * (double)buf.f_bsize;
-          retval = 1;
-      }
-    #endif
 
     return(retval);
 }
@@ -1591,11 +1429,7 @@ int CFSUtils::CompactPath(char *path)
         //remove all occurrences of "./" in the path.
         //look for "./" only
     pathptr = path;
-    #ifdef WIN32
       while ((ptr = strstr(pathptr,".\\")) != NULL) {
-    #else
-      while ((ptr = strstr(pathptr,"./")) != NULL) {
-    #endif
         if (ptr == path || *(ptr-1) != '.') {
                 //make xxx/./yyy/ -> "xxx/yyy/"
             *ptr = '\0';
@@ -1610,11 +1444,7 @@ int CFSUtils::CompactPath(char *path)
 
         //remove all occurrences of "../" in the path.
         //look for "../" only
-    #ifdef WIN32
       while ((ptr = strstr(path,"..\\")) != NULL) {
-    #else
-      while ((ptr = strstr(path,"../")) != NULL) {
-    #endif
         if (ptr == path)
             *ptr = '\0';
         else
@@ -1675,22 +1505,14 @@ void CFSUtils::CreateRelativePath(char *path, int maxpath)
         return;
 
         //check if the path is already a relative path
-    #ifdef WIN32
       if (strncmp(path,".\\",2) == 0 || strncmp(path,"..\\",3) == 0)
-    #else
-      if (strncmp(path,"./",2) == 0 || strncmp(path,"../",3) == 0)
-    #endif
         return;
 
     if ((tmpbuff = (char *)malloc(strlen(path)+1)) == NULL)
         return;
     strcpy(tmpbuff,path);
 
-    #ifdef WIN32
       strcpy(path,".\\");
-    #else
-      strcpy(path,"./");
-    #endif
     strncat(path,tmpbuff,maxpath-3);
     path[maxpath-1] = '\0';
 

@@ -20,11 +20,7 @@
 //
 //////////////////////////////////////////////////////////////////////
 
-#ifdef WIN32
   #include <process.h>
-#else
-  #include <pthread.h>
-#endif
 
 #include "Thr.h"
 
@@ -57,7 +53,7 @@ CThr::~CThr()
 // NOTE: For WINDOWS the passed-in function must return "void"
 //       For UNIX the passed-in function must return "void *"
 //
-#ifdef WIN32
+
 int CThr::Create(void (* fptr)(void *), void *args)
 {
 
@@ -66,20 +62,6 @@ int CThr::Create(void (* fptr)(void *), void *args)
     else
         return(1);
 }
-#else
-int CThr::Create(void *(* fptr)(void *), void *args)
-{
-    pthread_t tid;
-
-    if (pthread_create(&tid,NULL,fptr,args) != 0) { //UNIX implementation
-        return(0);
-    } else {
-        pthread_detach(tid); //indicates resources can be reclaimed on exit
-        return(1);
-    }
-
-}
-#endif
 
 //////////////////////////////////////////////////////////////////////
 // Terminates a thread created by Create()
@@ -89,12 +71,7 @@ int CThr::Create(void *(* fptr)(void *), void *args)
 void CThr::Destroy(void)
 {
 
-    #ifdef WIN32
       _endthread(); //WINDOWS implementation
-    #else
-      void *retval;
-      pthread_exit((void *)(&retval));  //UNIX implementation
-    #endif
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -107,11 +84,7 @@ void CThr::Destroy(void)
 long CThr::GetCurrentThrID()
 {
 
-    #ifdef WIN32
       return(GetCurrentThreadId());
-    #else
-      return((long)pthread_self());
-    #endif
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -124,11 +97,7 @@ long CThr::GetCurrentThrID()
 int CThr::InitializeCritSec(thrSync_t *mutex)
 {
 
-    #ifdef WIN32
       InitializeCriticalSection(mutex);
-    #else
-      pthread_mutex_init(mutex,NULL);
-    #endif
 
     return(1);
 }
@@ -143,11 +112,7 @@ int CThr::InitializeCritSec(thrSync_t *mutex)
 int CThr::P(thrSync_t *mutex)
 {
 
-    #ifdef WIN32
       EnterCriticalSection(mutex);
-    #else
-      pthread_mutex_lock(mutex);
-    #endif
 
     return(1);
 }
@@ -162,11 +127,7 @@ int CThr::P(thrSync_t *mutex)
 int CThr::V(thrSync_t *mutex)
 {
 
-    #ifdef WIN32
       LeaveCriticalSection(mutex);
-    #else
-      pthread_mutex_unlock(mutex);
-    #endif
 
     return(1);
 }
@@ -181,11 +142,7 @@ int CThr::V(thrSync_t *mutex)
 int CThr::DestroyCritSec(thrSync_t *mutex)
 {
 
-    #ifdef WIN32
       DeleteCriticalSection(mutex);
-    #else
-      pthread_mutex_destroy(mutex);
-    #endif
 
     return(1);
 }

@@ -25,9 +25,7 @@
 #include <ctype.h>
 #include <stdarg.h> //for va_list, etc.
 
-#ifdef WIN32
   #include <conio.h>  //for getch()
-#endif
 
 #include "StrUtils.h"
 
@@ -64,11 +62,7 @@ int CStrUtils::CaseCmp(const char *str1, const char *str2)
     if (str1 == NULL || str2 == NULL)
         return(-1);
 
-    #ifdef WIN32
         retval = stricmp(str1,str2);        //for WINDOWS
-    #else
-        retval = strcasecmp(str1,str2);     //for UNIX
-    #endif
 
     return(retval);
 }
@@ -313,7 +307,6 @@ char *CStrUtils::GetStrHidden(char *buffer, int maxbuffersize)
     if (buffer == NULL || maxbuffersize <= 0)
         return(buffer);
 
-    #ifdef WIN32
       char c;
       int i = 0;
 
@@ -328,11 +321,6 @@ char *CStrUtils::GetStrHidden(char *buffer, int maxbuffersize)
           }
       } while (c != '\n' && c != '\r' && i < maxbuffersize-1);
       *(buffer+i) = '\0';
-    #else
-      system("stty -echo");   // turn off echo
-      fgets(buffer,maxbuffersize,stdin);
-      system("stty echo");    // restore echo
-    #endif
     printf("\n");
 
     return(buffer);
@@ -515,11 +503,8 @@ int CStrUtils::SNPrintf(char *buffer, unsigned int size, const char *format, ...
     va_start(parg,format);
 
         //write the arguments into the buffer
-    #ifdef WIN32    //for Windows
+        //for Windows
         nchars = _vsnprintf((char*)buffer,size,format,parg);
-    #else   //for UNIX
-        nchars = vsnprintf((char*)buffer,size,format,parg);
-    #endif
 
     va_end(parg);
 

@@ -22,11 +22,7 @@
 #ifndef SSLSOCK_H
 #define SSLSOCK_H
 
-#ifdef WIN32
-  //#include <winsock.h>
-#else
-  typedef int SOCKET;   //Make compatible with MSVC.
-#endif
+  #include <winsock2.h>
 
 #ifdef INVALID_SOCKET
   #define SSLSOCK_INVALID INVALID_SOCKET

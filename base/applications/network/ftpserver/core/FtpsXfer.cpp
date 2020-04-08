@@ -25,11 +25,7 @@
 #include <time.h>
 #include <fcntl.h>      //added for O_RDONLY, O_WRONLY, O_TRUNC, O_CREAT, O_BINARY
 
-#ifdef WIN32
   #include <io.h>       //for open(), read(), write(), close()
-#else
-  #include <unistd.h>   //for open(), read(), write(), close()
-#endif
 
 #include "FtpsXfer.h"
 #include "Timer.h"
@@ -50,11 +46,7 @@
     //NOTE: This function does not check the validity of the buffers
     //      xferinfo->path, xferinfo->cwd, or xferinfo->userroot.
     //      The pointers psiteinfo and pftps are also not checked.
-#ifdef WIN32
   void ftpsXferThread(void *vp)     //WINDOWS must return "void" to run as a new thread
-#else
-  void *ftpsXferThread(void *vp)    //UNIX must return "void *" to run as a new thread
-#endif
 {
     ftpsXferInfo_t *xferinfo;
     CFtpsXfer *pxfer;
@@ -63,11 +55,7 @@
     args[0] = cmd; args[1] = arg;
 
     if (vp == NULL)
-        #ifdef WIN32
           return;
-        #else
-          return(NULL);
-        #endif
 
     xferinfo = (ftpsXferInfo_t *)vp;
 
@@ -103,9 +91,6 @@
     free(xferinfo->userroot);
     free(vp);
 
-    #ifndef WIN32
-      return(NULL);
-    #endif
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -281,9 +266,8 @@ int CFtpsXfer::RecvFile(ftpsXferInfo_t *xferinfo)
 
         //open a file for writing
     oflag = ((xferinfo->restoffset > 0) ? (O_APPEND | O_RDWR) : (O_TRUNC | O_WRONLY)) | O_CREAT;
-    #ifdef WIN32 //include O_BINARY for WINDOWS
+    //include O_BINARY for WINDOWS
       oflag |= O_BINARY;
-    #endif
     if ((fdw = open(filepath,oflag,0666)) < 0) {
         fsutils.FreePath(filepath);
         if ((buffer = (char *)malloc(strlen(xferinfo->path)+49)) != NULL) {
@@ -428,11 +412,8 @@ int CFtpsXfer::SendFile(ftpsXferInfo_t *xferinfo)
     }
 
         //open a file for reading
-    #ifdef WIN32 //include O_BINARY for WINDOWS
+    //include O_BINARY for WINDOWS
       if ((fdr = open(filepath,O_RDONLY | O_BINARY,0666)) < 0) {
-    #else
-      if ((fdr = open(filepath,O_RDONLY,0666)) < 0) {
-    #endif
         fsutils.FreePath(filepath);
         if ((buffer = (char *)malloc(strlen(xferinfo->path)+45)) != NULL) {
             sprintf(buffer,"%s: The system cannot find the file specified.",xferinfo->path);
@@ -719,9 +700,7 @@ long CFtpsXfer::RecvFileData(ftpsXferInfo_t *xferinfo, int fdw)
     long nbytes = 0;
     int packetlen = 0, tmppacketlen = 0;
     CTimer timer;
-    #ifdef WIN32
       char lastchar = ' ';
-    #endif
 
         //move the file pointer to the proper restart position
         //(used if command is APPE or REST was specified)
@@ -754,7 +733,6 @@ long CFtpsXfer::RecvFileData(ftpsXferInfo_t *xferinfo, int fdw)
             return(0);  //if there was an error receiving the data
         }
         if (xferinfo->type == 'A') {  //Recv in ASCI mode
-            #ifdef WIN32
                   //For WINDOWS OS an ASCII file will always contain \r\n (NOT \n)
               if ((tmppacket = BtoA(lastchar,packet,packetlen,&tmppacketlen)) != NULL) {
                   lastchar = tmppacket[tmppacketlen-1];
@@ -764,16 +742,6 @@ long CFtpsXfer::RecvFileData(ftpsXferInfo_t *xferinfo, int fdw)
                   free(packet);
                   return(0);    //out of memory
               }
-            #else                   //Recv in BINARY mode
-                  //For UNIX OS an ASCII file will always contain \n (NOT \r\n)
-              if ((tmppacket = AtoU(packet,packetlen,&tmppacketlen)) != NULL) {
-                  write(fdw,tmppacket,tmppacketlen);
-                  free(tmppacket);
-              } else {
-                  free(packet);
-                  return(0);    //out of memory
-              }
-            #endif
         } else {
             write(fdw,packet,packetlen);
         }

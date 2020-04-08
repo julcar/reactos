@@ -32,9 +32,7 @@
 #include <sys/timeb.h>  //for ftime (struct timeb)
 #include <stdarg.h>     //for va_list, etc.
 
-#ifdef WIN32
   #include <windows.h>  //for FileTimeToSystemTime()
-#endif
 
 #include "SiteInfo.h"
 #include "FSUtils.h"
@@ -388,11 +386,7 @@ int CSiteInfo::WriteToProgLog(const char *subsystem, const char *msgformat, ...)
         }
 
             //write the arguments into the buffer
-        #ifdef WIN32
           nchars = _vsnprintf((char*)buffer1,buffersize,msgformat,parg); //for Windows
-        #else
-          nchars = vsnprintf((char*)buffer1,buffersize,msgformat,parg);  //for UNIX
-        #endif
 
         if (nchars < 0) {
                 //The string was too long!
@@ -867,7 +861,6 @@ struct tm *CSiteInfo::GetTimeR(long ctime, struct tm *tmoutput, int flaggmt)
 
     memset(tmoutput,0,sizeof(struct tm));
 
-    #ifdef WIN32
       FILETIME filetime;
       LONGLONG ll;
       SYSTEMTIME systemtime;
@@ -890,12 +883,6 @@ struct tm *CSiteInfo::GetTimeR(long ctime, struct tm *tmoutput, int flaggmt)
       } else {
           ltimeptr = NULL;
       }
-    #else
-      if (flaggmt == 0)
-        ltimeptr = localtime_r(&ctime,tmoutput);
-      else
-        ltimeptr = gmtime_r(&ctime,tmoutput);
-    #endif
 
     return(ltimeptr);
 }

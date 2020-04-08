@@ -22,14 +22,9 @@
 #ifndef THR_H
 #define THR_H
 
-#ifdef WIN32
   #include <windows.h>
   #include <winbase.h>
   typedef CRITICAL_SECTION thrSync_t;
-#else
-  #include <pthread.h>
-  typedef pthread_mutex_t thrSync_t;
-#endif
 
 
 class CThr  
@@ -38,11 +33,8 @@ public:
     CThr();
     virtual ~CThr();
 
-    #ifdef WIN32
       int Create(void (* fptr)(void *), void *args);  //WINDOWS
-    #else
-      int Create(void *(* fptr)(void *), void *args); //UNIX
-    #endif
+
     void Destroy(void);  //called by the running thread (to exit)
 
     long GetCurrentThrID();

@@ -22,12 +22,8 @@
 #ifndef SOCK_H
 #define SOCK_H
 
-#ifdef WIN32
   #include <winsock2.h>
   typedef int socklen_t;    //Make compatible with UNIX
-#else
-  typedef int SOCKET;       //Make compatible with MSVC.
-#endif
 
 #ifdef INVALID_SOCKET
   #define SOCK_INVALID INVALID_SOCKET

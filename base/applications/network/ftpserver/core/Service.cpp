@@ -26,14 +26,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#ifdef WIN32    //Windows includes
-#else           //UNIX includes
-  #include <unistd.h>
-  #include <errno.h>
-  #include <fcntl.h>
-  #include <sys/stat.h>
-#endif
-
 #include "Service.h"
 
 
@@ -54,7 +46,7 @@ CService::CService(char *servicename)
 
     _serviceptr = this;
 
-    #ifdef WIN32    //Windows initialization
+        //Windows initialization
         m_checkpoint = 0;
             //SERVICE_STATUS members that rarely change
         m_currentstat.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
@@ -63,8 +55,6 @@ CService::CService(char *servicename)
         m_srvstathandle = 0;
             //by default only accept SERVICE_ACCEPT_STOP
         m_controlsaccepted = SERVICE_ACCEPT_STOP;
-    #else           //UNIX initialization
-    #endif
 }
 
 CService::~CService(void)
@@ -119,7 +109,6 @@ int CService::StopService()
 // Private Methods
 //////////////////////////////////////////////////////////////////////
 
-#ifdef WIN32
 ////////////////////////////////////////
 // Windows Methods
 ////////////////////////////////////////
@@ -218,109 +207,3 @@ void WINAPI CService::ServiceCtrl(DWORD dwCtrlCode)
     }
 }
 
-
-#else
-////////////////////////////////////////
-// UNIX Methods
-////////////////////////////////////////
-
-int CService::DoStartSrv(int argc, char **argv)
-{
-/*
-    pid_t childpid;
-    int retries, pgrpid, fd_limit, fd;
-
-    //////// Fork 1st time ////////
-    for (retries = 5; retries; retries--) {
-        childpid = fork();
-            //Child process
-        if (childpid == (pid_t)0)
-            break;
-
-        //////// Parent process ////////
-        if (childpid == (pid_t)(-1)) {
-            if (errno == EAGAIN) {
-                    //can't fork temporarily.  wait 5 seconds
-                    //then try again
-                sleep(5);
-                continue;
-            }
-        } else {
-                //we have forked successfully.
-                //allow the parent process to exit gracefully.
-            _exit(0);
-        }
-    } if (retries == 0) {
-        return(0);
-    }
-
-    //////// Child Process continues on.... ////
-
-    //////// Set sid ////////
-    pgrpid = setsid();
-    //if (pgrpid == -1)
-    //    printf ("setsid() failed\n");
-
-    //////// Fork again ////////
-    for (retries = 5; retries; retries--) 	{
-        childpid = fork();
-            //////// Child process ////////
-        if (childpid == (pid_t)0) 
-            break;
-
-            //////// Parent process ////////
-        if (childpid == (pid_t)(-1)) {
-            if (errno == EAGAIN)  {
-                    //can't fork temporarily.  wait 5 seconds 
-                    //then try again
-                sleep(5);
-                continue;
-            }
-        } else {
-                //we have forked successfully.
-                //allow the parent process to exit gracefully
-            _exit(0);
-        }
-    } if (retries == 0) {
-        return(0);
-    }
-
-    //////// Get complete control over permissions ////
-    umask(0);
-
-        //Close open file descriptors
-        //(stdin, stdout, stderr, and any other file descriptors that could be open)
-    fd_limit = sysconf(_SC_OPEN_MAX);
-    if (fd_limit < 0) {
-        fd_limit = 256;	//guess for max number of file descriptors to close
-    }
-    //fd_limit = FD_SETSIZE;
-    fd = 0;
-    while (fd < fd_limit)
-        close(fd++);
-
-        //Clear the error number just in case
-    errno = 0;
-
-        //Get open file descriptors for stdin, stdout, and stderr.  These could be log
-        //files, or /dev/null, but they should be kept open even if they won't be used.
-    fd = open("/dev/null",O_RDWR);  // stdin
-    dup(0);                         // stdout
-    dup(0);                         // stderr
-    dup(0);                         // one for good luck
-*/
-
-        //call the starting point of the application
-    if (_serviceptr->m_runptr(argc,argv) == 0)
-        return(1);
-    else
-        return(0);
-}
-
-int CService::DoStopSrv()
-{
-
-    return(1);
-}
-
-#endif

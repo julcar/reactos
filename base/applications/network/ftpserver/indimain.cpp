@@ -48,13 +48,9 @@ typedef struct {
     CIndiSiteInfo *psiteinfo;
 } _ListenInfo_t;
     //functions used to listen for FTP connections in a separate thread
-#ifdef WIN32    //WINDOWS must return "void" to run as a new thread
+    //WINDOWS must return "void" to run as a new thread
   static void _listenthread(void *vplisteninfo);    //listen for a normal FTP connection
   static void _listensslthread(void *vplisteninfo); //listen for an implicit SSL FTP connection
-#else           //UNIX must return "void *" to run as a new thread
-  static void *_listenthread(void *vplisteninfo);
-  static void *_listensslthread(void *vplisteninfo);
-#endif
     //flags used to check if the listening threads are running
 static int _flaglisten = 0;     //0 = _listenthread is not active
 static int _flaglistenssl = 0;  //0 = _listensslthread is not active
@@ -69,11 +65,7 @@ static void _sighandler(int sig);
 static int _iscommandxfer(char *command);
 
     //the main function that handles the client connections
-#ifdef WIN32
   static void _connect(void *vpftps);   //WINDOWS must return "void" to run as a new thread
-#else
-  static void *_connect(void *vpftps);  //UNIX must return "void *" to run as a new thread
-#endif
 
     //Used to signal the program to refresh (this is set in _sighandler())
 static int _flaghup = 0;
@@ -101,16 +93,7 @@ int main(int argc, char **argv)
     signal(SIGINT,_sighandler);     //Ctrl-C
     signal(SIGTERM,_sighandler);
     signal(SIGABRT,_sighandler);
-    #ifdef WIN32
       signal(SIGBREAK,_sighandler); //Ctrl-Break
-    #else
-      signal(SIGQUIT,_sighandler);
-      signal(SIGKILL,_sighandler);
-      signal(SIGSTOP,_sighandler);
-      signal(SIGALRM,_sighandler);
-      signal(SIGHUP,_sighandler);
-      signal(SIGPIPE,_sighandler);
-    #endif
 
     if (argc >= 2) {
         if (strncmp(argv[1],"-h",2) == 0) {
@@ -231,11 +214,8 @@ int main(int argc, char **argv)
 }
 
     //listen for a normal FTP connection (specified by the -p option)
-#ifdef WIN32    //WINDOWS must return "void" to run as a new thread
+    //WINDOWS must return "void" to run as a new thread
   static void _listenthread(void *vplisteninfo)
-#else           //UNIX must return "void *" to run as a new thread
-  static void *_listenthread(void *vplisteninfo)
-#endif
 {
     _ListenInfo_t *listeninfo = (_ListenInfo_t *)(vplisteninfo);
     CSock sock;
@@ -267,18 +247,11 @@ int main(int argc, char **argv)
     free(listeninfo);
 
     _flaglisten = 0;    //indicate the listen thread is inactive
-    
-    #ifndef WIN32
-      return(NULL);     //UNIX must return a value
-    #endif
 }
 
     //listen for an implicit SSL FTP connection (specified by the -i option)
-#ifdef WIN32    //WINDOWS must return "void" to run as a new thread
+    //WINDOWS must return "void" to run as a new thread
   static void _listensslthread(void *vplisteninfo)
-#else           //UNIX must return "void *" to run as a new thread
-  static void *_listensslthread(void *vplisteninfo)
-#endif
 {
     _ListenInfo_t *listeninfo = (_ListenInfo_t *)(vplisteninfo);
     CSock sock;
@@ -299,11 +272,7 @@ int main(int argc, char **argv)
     if (privkeybuf == NULL || certbuf == NULL) {
         listeninfo->psiteinfo->WriteToProgLog("MAIN","WARNING: unable to initialize the SSL information.");
         _flaglistenssl = 0;     //indicate the SSL listen thread is inactive
-        #ifndef WIN32
-          return(NULL); //UNIX must return a value
-        #else
           return;       //WINDOWS returns void
-        #endif
     }
 
     while (siteinfoFlagQuit == 0) {
@@ -347,10 +316,6 @@ int main(int argc, char **argv)
     free(listeninfo);
 
     _flaglistenssl = 0;     //indicate the SSL listen thread is inactive
-      
-    #ifndef WIN32
-      return(NULL);   //UNIX must return a value
-    #endif
 }
 
     //Display the usage screen for the server.
@@ -798,16 +763,6 @@ static int _initserver(CIndiSiteInfo *psiteinfo, int argc, char **argv, char *bi
     //standard signal handler used to catch signals such as SIGINT
 static void _sighandler(int sig)
 {
-
-    #ifndef WIN32
-      if (sig == SIGPIPE)   //ignore SIGPIPE
-          return;
-      if (sig == SIGHUP) {
-          _flaghup = 1;
-          return;
-      }
-    #endif
-
     siteinfoFlagQuit = 1;  //exit the program
 }
 
@@ -838,11 +793,7 @@ static int _iscommandxfer(char *command)
 
     //This is the main function that handles each client.
     //This function is run in a new thread for each client connection.
-#ifdef WIN32
   static void _connect(void *vpftps)    //WINDOWS must return "void" to run as a new thread
-#else
-  static void *_connect(void *vpftps)   //UNIX must return "void *" to run as a new thread
-#endif
 {
     CIndiFtps *pftps = (CIndiFtps *)vpftps; //FTP server class
     CTermsrv ftpscmd;       //Terminal command class (used to send and recv FTP commands)
@@ -1040,8 +991,4 @@ static int _iscommandxfer(char *command)
     delete pftps;  //delete the FTP server class
 
     _nconnections--;    //decrement the number of current client connections
-
-    #ifndef WIN32
-      return(NULL);   //UNIX must return a value
-    #endif
 }

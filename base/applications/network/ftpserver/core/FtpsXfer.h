@@ -38,11 +38,7 @@ class CSiteInfo;    //dummy declaration (needed to avoid compiler errors)
 ///////////////////////////////////////////////////////////////////////////////
 
     //function used to start the transfer thread
-#ifdef WIN32
   void ftpsXferThread(void *vp);    //WINDOWS must return "void" to run as a new thread
-#else
-  void *ftpsXferThread(void *vp);   //UNIX must return "void *" to run as a new thread
-#endif
 
 typedef struct {
     char command;       //L = dir list, R = receive data, S = send data

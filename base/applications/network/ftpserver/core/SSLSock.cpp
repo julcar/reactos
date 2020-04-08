@@ -48,11 +48,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#ifdef WIN32
   #include <fcntl.h>    //added for O_BINARY
-#else
-  #include <openssl/rand.h>
-#endif
 
 #include "Thr.h"
 #include "SSLSock.h"
@@ -60,11 +56,7 @@
 #if defined(MONOLITH) && !defined(OPENSSL_C)
   #define apps_startup() do_pipe_sig()
 #else
-  #ifdef WIN32
     #define apps_startup() _fmode=O_BINARY; CRYPTO_malloc_init(); SSLeay_add_all_algorithms()
-  #else
-    #define apps_startup() SSLeay_add_all_algorithms();
-  #endif
 #endif
 
 
@@ -1131,13 +1123,8 @@ long CSSLSock::GetFileSize(const char *filepath)
     if (filepath == NULL)
         return(0);
 
-    #ifdef WIN32
       struct _stat filestatus;
       retval = _stat(filepath,&filestatus);
-    #else
-      struct stat filestatus;
-      retval = stat(filepath,&filestatus);
-    #endif
 
     if (retval != 0)
         return(0);  //unable to get the stats for the file
@@ -1148,9 +1135,6 @@ long CSSLSock::GetFileSize(const char *filepath)
 void CSSLSock::InitRand()
 {
 
-    #ifndef WIN32
-      RAND_load_file("/dev/urandom",1024);
-    #endif
 }
 
 

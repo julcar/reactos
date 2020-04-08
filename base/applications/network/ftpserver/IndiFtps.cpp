@@ -95,11 +95,7 @@ int CIndiFtps::DoSITE(int argc, char **argv)
 int CIndiFtps::DoSiteVERS(int argc, char **argv)
 {
     char progname[32], progver[32], corever[32];
-    #ifdef WIN32
       char platform[] = "WINDOWS";
-    #else
-      char platform[] = "UNIX";
-    #endif
 
         //build the response line (stored in m_linebuffer)
     WriteToLineBuffer("%s %s (%s) %s.",m_pindisiteinfo->GetProgName(progname,sizeof(progname)),

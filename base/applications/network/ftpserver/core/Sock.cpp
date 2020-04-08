@@ -25,18 +25,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#ifndef WIN32
-  #include <unistd.h>
-  #include <sys/types.h>
-  #include <sys/time.h>
-  #include <sys/socket.h>
-  #include <netinet/in.h>
-  #include <arpa/inet.h>
-  #include <netdb.h>
-  #include <fcntl.h>
-  #include <errno.h>
-#endif
-
 #include "Sock.h"
 
 //////////////////////////////////////////////////////////////////////
@@ -72,7 +60,6 @@ CSock::~CSock()
 //
 int CSock::Initialize()
 {
-    #ifdef WIN32
       WSADATA wsaData;
       WORD wVerReq;
 
@@ -82,7 +69,6 @@ int CSock::Initialize()
           WSACleanup();
           return(0);    //couldn't initialize sockets
       }
-    #endif
 
     return(1);
 }
@@ -97,13 +83,10 @@ int CSock::Initialize()
 //
 int CSock::Uninitialize()
 {
-
-    #ifdef WIN32
           //Run WSACleanup before exiting
       if (WSACleanup() == SOCKET_ERROR) {
           return(0);
       }
-    #endif
 
     return(1);
 }
@@ -384,12 +367,7 @@ void CSock::Shutdown(SOCKET sd, int flag)
 //
 void CSock::Close(SOCKET sd)
 {
-
-    #ifdef WIN32
       closesocket(sd);
-    #else
-      close(sd);
-    #endif
 }
 
 ////////////////////////////////////////
@@ -951,25 +929,15 @@ int CSock::Connect(SOCKET sd, struct sockaddr *saddr, int nsec)
     socklen_t len;
 
         //set socket to non-blocking
-    #ifdef WIN32
       unsigned long ularg;
       ularg = 1;
       retval = ioctlsocket(sd,FIONBIO,&ularg);
-    #else
-      int fflags;
-      fflags = fcntl(sd,F_GETFL);
-      retval = fcntl(sd,F_SETFL,fflags|O_NONBLOCK);
-    #endif
 
     if (retval != SOCK_ERROR) {
         if (connect(sd,saddr,sizeof(struct sockaddr)) != SOCK_ERROR) {
             flagconnected = 1;
         } else {
-            #ifdef WIN32
               if (GetLastError() == WSAEWOULDBLOCK) {
-            #else
-              if (GetLastError() == EINPROGRESS) {
-            #endif
                     //connect succeeded as a non-blocking call
                     //now select to wait for the connection to be completed
                 FD_ZERO(&writefds);
@@ -994,12 +962,8 @@ int CSock::Connect(SOCKET sd, struct sockaddr *saddr, int nsec)
 
     if (flagconnected != 0) {
             //unset non-blocking
-        #ifdef WIN32
           ularg = 0;
           retval = ioctlsocket(sd,FIONBIO,&ularg);
-        #else
-          retval = fcntl(sd,F_SETFL,fflags);
-        #endif
 
     }
 
@@ -1011,11 +975,7 @@ int CSock::GetLastError()
 {
     int errval;
 
-    #ifdef WIN32
         errval = WSAGetLastError();
-    #else
-        errval = errno;
-    #endif
 
     return(errval);
 }

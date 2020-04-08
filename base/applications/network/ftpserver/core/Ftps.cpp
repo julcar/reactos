@@ -1692,11 +1692,7 @@ int CFtps::DoSYST(int argc, char **argv)
     if (CheckPermissions("SYST",NULL,"sx") == 0)
         return(0);
 
-    #ifdef WIN32
       EventHandler(argc,argv,"WINDOWS","215",1,1,0);
-    #else
-      EventHandler(argc,argv,"UNIX","215",1,1,0);
-    #endif
 
     return(1);
 }
@@ -1990,11 +1986,8 @@ int CFtps::WriteToLineBuffer(const char *lineformat, ...)
     va_start(parg,lineformat);
 
         //write the arguments into the buffer
-    #ifdef WIN32    //for Windows
+        //for Windows
         nchars = _vsnprintf((char*)m_linebuffer,sizeof(m_linebuffer),lineformat,parg);
-    #else   //for UNIX
-        nchars = vsnprintf((char*)m_linebuffer,sizeof(m_linebuffer),lineformat,parg);
-    #endif
 
     va_end(parg);
 

@@ -19,13 +19,9 @@
 // Timer.cpp: implementation of the CTimer class.
 //
 //////////////////////////////////////////////////////////////////////
-#ifdef WIN32
+
   #include <windows.h>
   #include <winbase.h>
-#else
-  #include <unistd.h>
-  #include <sys/time.h> //for gettimeofday()
-#endif
 
 #include "Timer.h"
 
@@ -57,7 +53,6 @@ CTimer::~CTimer()
 unsigned long CTimer::Get() {
     unsigned long rettime = 1;
 
-    #ifdef WIN32
       FILETIME systemtimeasfiletime;
       LARGE_INTEGER litime;
 
@@ -66,16 +61,6 @@ unsigned long CTimer::Get() {
       litime.QuadPart /= 10000;  //convert to milliseconds
       litime.QuadPart &= 0xFFFFFFFF;    //keep only the low part
       rettime = (unsigned long)(litime.QuadPart);
-    #else
-      struct timeval tv;
-      struct timezone tz;
-      unsigned long t1, t2;
-
-      gettimeofday(&tv,&tz);
-      t1 = (tv.tv_sec & 0x003FFFFF) * 1000; //convert sec to milliseconds
-      t2 = (tv.tv_usec / 1000) % 1000;      //convert usec to milliseconds
-      rettime = t1 + t2;
-    #endif
 
     return(rettime);
 }
@@ -134,9 +119,5 @@ float CTimer::DiffSec(unsigned long timestart, unsigned long timeend) {
 //
 void CTimer::Sleep(unsigned long numms) {
 
-    #ifdef WIN32
       SleepEx(numms,false);
-    #else
-      usleep(numms*1000);   //usleep uses microseconds
-    #endif
 }

@@ -26,11 +26,8 @@
 
 #define FSUTILS_MAXPATH 256     //max length of a file/dir path
 
-#ifdef WIN32
   #define FSUTILS_SLASH '\\'    //Windows slash
-#else
-  #define FSUTILS_SLASH '/'     //UNIX slash
-#endif
+
 
 typedef struct {
     long groupid;

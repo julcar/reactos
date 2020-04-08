@@ -25,11 +25,9 @@
 #ifndef SERVICE_H
 #define SERVICE_H
 
-#ifdef WIN32    //Windows includes
+  //Windows includes
   #include <windows.h>
   #include <winsvc.h>
-#else           //UNIX includes
-#endif
 
 
 class CService
@@ -50,7 +48,7 @@ private:
     int *m_flagshutdown;
     int (* m_runptr)(int, char **);
 
-#ifdef WIN32    //Windows specific functions/variables
+//Windows specific functions/variables
 private:
     BOOL ReportStatus(DWORD dwCurrentState, DWORD dwWaitHint = 3000, DWORD dwErrExit = 0);
         //static functions
@@ -61,9 +59,6 @@ private:
     SERVICE_STATUS m_currentstat;           //current status of the service
     SERVICE_STATUS_HANDLE m_srvstathandle;  //service status handle
     DWORD m_controlsaccepted;               //bit-field of what ctrl req the srv will accept
-#else           //UNIX specific functions/variables
-
-#endif
 
 };
 
