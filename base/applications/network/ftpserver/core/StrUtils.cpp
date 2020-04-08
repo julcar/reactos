@@ -318,7 +318,7 @@ char *CStrUtils::GetStrHidden(char *buffer, int maxbuffersize)
       int i = 0;
 
       do {
-          c = getch();
+          c = _getch();
           *(buffer+i) = c;
           if (c == 8) {    //if Backspace was pressed
               if (i > 0)
@@ -531,8 +531,8 @@ int CStrUtils::SNPrintf(char *buffer, unsigned int size, const char *format, ...
 
 //////////////////////////////////////////////////////////////////////
 // Makes sure a string is formatted to be contained in quotes.  All
-// occurrences of " will be replaced by \" and all occurrences of \
-// will be replaced by \\ if necessary.
+// occurrences of " will be replaced by \" and all occurrences of \ will
+// be replaced by \\ if necessary.
 //
 // [in] buffer : String to reformat
 //

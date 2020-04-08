@@ -603,7 +603,7 @@ void CFtpsXfer::SendListData(ftpsXferInfo_t *xferinfo, long *nbytes)
     xferinfo->psiteinfo->GetTimeString(thisyear,sizeof(thisyear),"%Y",time(NULL));
 
         //check if the fullpath is a file.
-    BuildListLine(fullpath,"",listline,listlinelen,xferinfo,2,thisyear);
+    BuildListLine(fullpath,(char *)"",listline,listlinelen,xferinfo,2,thisyear);
     if (*listline != '\0') {
         if ((ptr = strchr(listline,'\r')) != NULL) {
             *ptr = '\0';
@@ -676,7 +676,7 @@ void CFtpsXfer::SendListData(ftpsXferInfo_t *xferinfo, long *nbytes)
         //to go through the sub-directories.
     if (strchr(xferinfo->options,'R') != NULL) {
             //force any remaining data in the buffer to be sent (and add a \r\n)
-        *nbytes += AddToSendBuffer(packet,FTPSXFER_MAXPACKETSIZE,&packetlen,"\r\n",2,xferinfo->flagencdata,1);
+        *nbytes += AddToSendBuffer(packet,FTPSXFER_MAXPACKETSIZE,&packetlen,(char *)"\r\n",2,xferinfo->flagencdata,1);
         free(packet);
             //List all the directories
         if ((handle = fsutils.DirGetFirstFile(fullpath,linebuf,FTPSXFER_MAXDIRENTRY)) <= 0) {
@@ -704,7 +704,7 @@ void CFtpsXfer::SendListData(ftpsXferInfo_t *xferinfo, long *nbytes)
         fsutils.DirClose(handle);
     } else {
             //force any remaining data in the buffer to be sent
-        *nbytes += AddToSendBuffer(packet,FTPSXFER_MAXPACKETSIZE,&packetlen,"",0,xferinfo->flagencdata,1);
+        *nbytes += AddToSendBuffer(packet,FTPSXFER_MAXPACKETSIZE,&packetlen,(char *)"",0,xferinfo->flagencdata,1);
         free(packet);
     }
 

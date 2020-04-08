@@ -192,9 +192,9 @@ void CSiteInfo::FreePWInfo(siteinfoPWInfo_t *pwinfo)
 ////////////////////////////////////////
 
     //Returns 1 if any of the "pflags" are present in the user's permissions
-int CSiteInfo::CheckPermissions(char *username, char *path, char *pflags)
+int CSiteInfo::CheckPermissions(const char *username, const char *path, const char *pflags)
 {
-    char *ptr;
+    const char *ptr;
 
     if (pflags == NULL)
         return(0);
@@ -416,7 +416,7 @@ int CSiteInfo::WriteToProgLog(const char *subsystem, const char *msgformat, ...)
 
         //Builds a log line for the program log file based on m_progformat
     GetTimeString(datebuffer,sizeof(datebuffer),m_dateformat);
-    if ((buffer2 = BuildProgLogLine(datebuffer,subsystem,buffer1)) == NULL) {
+    if ((buffer2 = BuildProgLogLine(datebuffer,const_cast<char*>(subsystem),buffer1)) == NULL) {
         free(buffer1);
         m_thr.V(&m_mutexproglog);   //exit the critical section
         return(0);
@@ -513,7 +513,7 @@ int CSiteInfo::SetAccessLogName(char *logfile, char *basepath /*=NULL*/)
     
     //Write to the access log
     //NOTE: all fields that are NULL or empty are printed as "-" in the log file.
-int CSiteInfo::WriteToAccessLog(char *sip, char *sp, char *cip, char *cp, char *user, char *cmd, char *arg, const char *status, const char *text)
+int CSiteInfo::WriteToAccessLog(char *sip, char *sp, char *cip, char *cp, char *user, const char *cmd, const char *arg, const char *status, const char *text)
 {
     char *buffer, *buffer1, datebuffer[64];
 
@@ -526,7 +526,7 @@ int CSiteInfo::WriteToAccessLog(char *sip, char *sp, char *cip, char *cp, char *
 
         //Builds a log line for the access log file based on m_accessformat
     GetTimeString(datebuffer,sizeof(datebuffer),m_dateformat);
-    if ((buffer = BuildAccessLogLine(datebuffer,sip,sp,cip,cp,user,cmd,arg,status,text)) == NULL) {
+    if ((buffer = BuildAccessLogLine(datebuffer,sip,sp,cip,cp,user,const_cast<char*>(cmd),const_cast<char*>(arg),const_cast<char*>(status),const_cast<char*>(text))) == NULL) {
         m_thr.V(&m_mutexaccesslog); //exit the critical section
         return(0);
     }
@@ -794,7 +794,7 @@ char *CSiteInfo::GetTimeString(char *buffer, int maxsize, const char *formatstri
     struct tm *ltimeptr, ltime;
     struct timeb timebuffer;
     long tmptime, len;
-    char *ptr, *tmpformatstring = NULL, utcoffset[16];
+    const char *ptr; char *tmpformatstring = NULL, utcoffset[16];
 
     if (buffer == NULL || maxsize == 0)
         return(buffer);

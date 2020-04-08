@@ -61,7 +61,7 @@ CThr::~CThr()
 int CThr::Create(void (* fptr)(void *), void *args)
 {
 
-    if (_beginthread(fptr,0,args) == -1)  //WINDOWS implementation
+    if ((int)_beginthread(fptr,0,args) == -1)  //WINDOWS implementation
         return(0);
     else
         return(1);

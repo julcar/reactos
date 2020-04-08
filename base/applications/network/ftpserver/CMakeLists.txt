@@ -29,5 +29,5 @@ list(APPEND CPP_SOURCE
 )
 add_executable(ftpserver ${CPP_SOURCE})
 set_module_type(ftpserver win32cui)
-add_importlibs(ftpserver user32 shell32 ws2_32 msvcrt kernel32)
+add_importlibs(ftpserver user32 ws2_32 advapi32 shell32 msvcrt kernel32)
 add_cd_file(TARGET ftpserver DESTINATION reactos/system32 FOR all)

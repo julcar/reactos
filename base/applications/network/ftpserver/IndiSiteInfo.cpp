@@ -25,11 +25,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../core/StrUtils.h"
-#include "../core/CmdLine.h"
-#include "../core/FSUtils.h"
-#include "../core/Sock.h"
-#include "../core/SSLSock.h"
+#include "core/StrUtils.h"
+#include "core/CmdLine.h"
+#include "core/FSUtils.h"
+#include "core/Sock.h"
+#include "core/SSLSock.h"
 #include "IndiFileUtils.h"
 #include "IndiSiteInfo.h"
 
@@ -440,7 +440,7 @@ int CIndiSiteInfo::GetDataPort(char *bindport, int maxportlen, int *sdptr, char 
 
     if (m_pasvlist == NULL) {
             //Let the OS pick the port
-        if ((*sdptr = sock.BindServer(bindport,maxportlen,bindip)) == SOCK_INVALID)
+        if ((*sdptr = sock.BindServer(bindport,maxportlen,bindip)) == (int)SOCK_INVALID)
             return(0);
         else
             return(1);
@@ -451,9 +451,9 @@ int CIndiSiteInfo::GetDataPort(char *bindport, int maxportlen, int *sdptr, char 
     nports = m_pasvend - m_pasvstart + 1;
 
     for (i = 0; i < nports; i++) {
-        if (m_pasvlist[i].sockdesc == SOCK_INVALID) {   //if the port is not in use
+        if (m_pasvlist[i].sockdesc == (int)SOCK_INVALID) {   //if the port is not in use
             if (nattempts < INDISITEINFO_MAXBINDATTEMPTS) {
-                if ((*sdptr = sock.BindServer(bindport,maxportlen,bindip,m_pasvlist[i].port)) == SOCK_INVALID) {
+                if ((*sdptr = sock.BindServer(bindport,maxportlen,bindip,m_pasvlist[i].port)) == (int)SOCK_INVALID) {
                     nattempts++;    //increment the number of attempted bindings
                 } else {
                     retval = 1; //a port was successfully binded to

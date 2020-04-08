@@ -23,7 +23,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "../core/StrUtils.h"
+#include "core/StrUtils.h"
 #include "IndiFtps.h"
 #include "IndiSiteInfo.h"
 

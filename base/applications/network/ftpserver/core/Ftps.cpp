@@ -1947,7 +1947,7 @@ long CFtps::GetLastActive()
 int CFtps::EventHandler(int argc, char **argv, const char *mesg, const char *ftpcode, int flagclient, int flagaccess, int flagprog, int respmode /*=0*/)
 {
     CCmdLine cmdline(0);
-    char *cmdptr, *argptr, empty[] = "";
+    const char *cmdptr, *argptr; char empty[] = "";
 
     if (argc == 0 || argv == NULL) {
         argptr = empty;
@@ -1974,7 +1974,7 @@ int CFtps::EventHandler(int argc, char **argv, const char *mesg, const char *ftp
     }
 
     if (argptr != empty)
-        cmdline.FreeCombineArgs(argptr);
+        cmdline.FreeCombineArgs(const_cast<char*>(argptr));
 
     return(1);
 }

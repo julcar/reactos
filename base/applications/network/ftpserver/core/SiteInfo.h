@@ -139,7 +139,7 @@ public:
     virtual void SetAccessLoggingLevel(int level);
     virtual void SetAccessLogFormatStr(char *formatstr);
     virtual int SetAccessLogName(char *logfile, char *basepath = NULL);
-    virtual int WriteToAccessLog(char *sip, char *sp, char *cip, char *cp, char *user, char *cmd, char *arg, const char *status, const char *text);
+    virtual int WriteToAccessLog(char *sip, char *sp, char *cip, char *cp, char *user, const char *cmd, const char *arg, const char *status, const char *text);
 
         //FTP data connection functions
     virtual int SetDataPortRange(unsigned short startport, unsigned short endport);

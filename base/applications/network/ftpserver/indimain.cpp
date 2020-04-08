@@ -128,7 +128,7 @@ int main(int argc, char **argv)
     sslsock.Initialize();
 
         //Create the class to store/access the site information
-    if ((psiteinfo = new CIndiSiteInfo(_PROGNAME,_PROGVERSION,FTPS_COREVERSION,"")) == NULL) {
+    if ((psiteinfo = new CIndiSiteInfo((char *)_PROGNAME,(char *)_PROGVERSION,(char *)FTPS_COREVERSION,(char *)"")) == NULL) {
         printf("ERROR: unable to allocate site information structure\n");
         return(1);
     }
@@ -253,8 +253,7 @@ int main(int argc, char **argv)
                 if ((pftps = new CIndiFtps(clientsd,listeninfo->psiteinfo)) != NULL) {
                     listeninfo->psiteinfo->WriteToProgLog("MAIN","Connection established from %s:%s -> %s (%u).",
                                     pftps->GetClientIP(),pftps->GetClientPort(),pftps->GetClientName(),clientsd);
-                    listeninfo->psiteinfo->WriteToAccessLog(pftps->GetServerIP(),pftps->GetServerPort(),pftps->GetClientIP(),
-                                                            pftps->GetClientPort(),pftps->GetLogin(),"CONNECT","","","");
+                    //listeninfo->psiteinfo->WriteToAccessLog(pftps->GetServerIP(),pftps->GetServerPort(),pftps->GetClientIP(),pftps->GetClientPort(),pftps->GetLogin(),"CONNECT","","","");
                         //start a new thread to handle the client connection
                     if (thr.Create(_connect,(void *)pftps) == 0) {
                         listeninfo->psiteinfo->WriteToProgLog("MAIN","WARNING: unable to create a new client thread.");
@@ -325,8 +324,7 @@ int main(int argc, char **argv)
                     }
                     listeninfo->psiteinfo->WriteToProgLog("MAIN","SSL connection established from %s:%s -> %s (%u).",
                                 pftps->GetClientIP(),pftps->GetClientPort(),pftps->GetClientName(),clientsd);
-                    listeninfo->psiteinfo->WriteToAccessLog(pftps->GetServerIP(),pftps->GetServerPort(),pftps->GetClientIP(),
-                                                            pftps->GetClientPort(),pftps->GetLogin(),"CONNECTSSL","","","");
+                    //listeninfo->psiteinfo->WriteToAccessLog(pftps->GetServerIP(),pftps->GetServerPort(),pftps->GetClientIP(),pftps->GetClientPort(),pftps->GetLogin(),"CONNECTSSL","","","");
                         //start a new thread to handle the client connection
                     if (thr.Create(_connect,(void *)pftps) == 0) {
                         listeninfo->psiteinfo->WriteToProgLog("MAIN","WARNING: unable to create a new client thread.");
@@ -533,7 +531,11 @@ static int _initserver(CIndiSiteInfo *psiteinfo, int argc, char **argv, char *bi
     CIndiFileUtils fileutils;
     CStrUtils strutils;     //String utilities class
     //CCrypto crypto;         //Encryption/Decryption class
+#if 0
     char *ptr, *pwenc, passwordbuffer[SITEINFO_MAXPWLINE];
+#else
+    char *ptr, passwordbuffer[SITEINFO_MAXPWLINE];
+#endif
     CFSUtils fsutils;       //File System Utilities class
     indisiteinfoUserProp_t userprop;
     int i, retval, startport, endport;
@@ -743,9 +745,9 @@ static int _initserver(CIndiSiteInfo *psiteinfo, int argc, char **argv, char *bi
                     if ((ptr = strchr(argv[i],':')) != NULL) {
                         ptr++;
                         if (*ptr != '\0') {
-                            if (psiteinfo->SetProgLogName(SITEINFO_DEFPROGLOG,ptr) == 0)
+                            if (psiteinfo->SetProgLogName(const_cast<char*>(SITEINFO_DEFPROGLOG),ptr) == 0)
                                 psiteinfo->WriteToProgLog("MAIN","WARNING: unable to set the program log path.");
-                            if (psiteinfo->SetAccessLogName(SITEINFO_DEFACCESSLOG,ptr) == 0)
+                            if (psiteinfo->SetAccessLogName(const_cast<char*>(SITEINFO_DEFACCESSLOG),ptr) == 0)
                                 psiteinfo->WriteToProgLog("MAIN","WARNING: unable to set the access log path.");
                         }
                     }
@@ -1030,7 +1032,7 @@ static int _iscommandxfer(char *command)
     if (ftpscmd.GetUseSSL() != 0) sslsock.SSLClose(pftps->GetSSLInfo());    //shutdown SSL
     sock.Close(pftps->GetSocketDesc()); //close the control connection
     psiteinfo->WriteToProgLog("MAIN","Connection closed (%u), %s disconnected.",pftps->GetSocketDesc(),pftps->GetLogin());
-    psiteinfo->WriteToAccessLog(pftps->GetServerIP(),pftps->GetServerPort(),pftps->GetClientIP(),pftps->GetClientPort(),pftps->GetLogin(),"DISCONNECT","","","");
+    //psiteinfo->WriteToAccessLog(pftps->GetServerIP(),pftps->GetServerPort(),pftps->GetClientIP(),pftps->GetClientPort(),pftps->GetLogin(),"DISCONNECT","","","");
 
         //DON'T delete the CFtps class until ALL connection threads have exited
     pftps->SetFlagAbor(1); pftps->SetFlagQuit(1); //stop all threads

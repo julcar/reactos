@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../core/FSUtils.h"
+#include "core/FSUtils.h"
 #include "IndiFileUtils.h"
 
 //////////////////////////////////////////////////////////////////////
